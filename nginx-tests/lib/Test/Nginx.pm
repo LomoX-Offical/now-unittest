@@ -39,11 +39,15 @@ sub new {
 	$self->{_pid} = $$;
 	$self->{_alerts} = 1;
 
-	$self->{_testdir} = tempdir(
-		'nginx-test-XXXXXXXXXX',
-		TMPDIR => 1
-	)
-		or die "Can't create temp directory: $!\n";
+	$self->{_testdir} = '../temp';
+	mkdir "$self->{_testdir}";
+	
+	#tempdir(
+	#	'nginx-test-XXXXXXXXXX',
+	#	TMPDIR => 1
+	#)
+	#	or die "Can't create temp directory: $!\n";
+
 	$self->{_testdir} =~ s!\\!/!g if $^O eq 'MSWin32';
 	mkdir "$self->{_testdir}/logs"
 		or die "Can't create logs directory: $!\n";

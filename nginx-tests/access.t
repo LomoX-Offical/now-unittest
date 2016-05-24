@@ -23,7 +23,7 @@ use Test::Nginx;
 select STDERR; $| = 1;
 select STDOUT; $| = 1;
 
-my $t = Test::Nginx->new()->has(qw/http proxy access ipv6 unix/);
+my $t = Test::Nginx->new()->has(qw/http proxy access ipv6/);
 
 $t->write_file_expand('nginx.conf', <<'EOF');
 
@@ -49,32 +49,32 @@ http {
             proxy_pass http://[::1]:8081/;
         }
 
-        location /unix/ {
-            proxy_pass http://unix:%%TESTDIR%%/unix.sock:/;
-        }
+        #location /unix/ {
+        #    proxy_pass http://unix:%%TESTDIR%%/unix.sock:/;
+        #}
 
     }
 
     server {
         listen       127.0.0.1:8081;
         listen       [::1]:8081;
-        listen       unix:%%TESTDIR%%/unix.sock;
+        #listen       unix:%%TESTDIR%%/unix.sock;
 
         location /allow_all {
             allow all;
         }
 
-        location /allow_unix {
-            allow unix:;
-        }
+        #location /allow_unix {
+        #    allow unix:;
+        #}
 
         location /deny_all {
             deny all;
         }
 
-        location /deny_unix {
-            deny unix:;
-        }
+        #location /deny_unix {
+        #    deny unix:;
+        #}
     }
 }
 
@@ -100,9 +100,9 @@ like(http_get('/inet6/deny_unix'), qr/404 Not Found/, 'inet6 deny unix');
 
 # tests with unix socket
 
-like(http_get('/unix/allow_all'), qr/404 Not Found/, 'unix allow all');
-like(http_get('/unix/allow_unix'), qr/404 Not Found/, 'unix allow unix');
-like(http_get('/unix/deny_all'), qr/403 Forbidden/, 'unix deny all');
-like(http_get('/unix/deny_unix'), qr/403 Forbidden/, 'unix deny unix');
+#like(http_get('/unix/allow_all'), qr/404 Not Found/, 'unix allow all');
+#like(http_get('/unix/allow_unix'), qr/404 Not Found/, 'unix allow unix');
+#like(http_get('/unix/deny_all'), qr/403 Forbidden/, 'unix deny all');
+#like(http_get('/unix/deny_unix'), qr/403 Forbidden/, 'unix deny unix');
 
 ###############################################################################
