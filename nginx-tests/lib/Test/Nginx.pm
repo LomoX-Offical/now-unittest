@@ -261,7 +261,7 @@ sub try_run($$) {
 sub plan($) {
 	my ($self, $plan) = @_;
 
-	Test::More::plan(tests => $plan);
+	Test::More::plan(tests => $plan + 2);
 
 	return $self;
 }

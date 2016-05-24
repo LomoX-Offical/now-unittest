@@ -66,7 +66,7 @@ http {
 
 EOF
 
-$t->try_run('no inet6 support')->plan(10);
+$t->try_run('no inet6 support')->plan(8);
 
 ###############################################################################
 
