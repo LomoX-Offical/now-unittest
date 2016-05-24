@@ -54,7 +54,6 @@ http {
     server {
         listen       127.0.0.1:8081;
         listen       [::1]:8081;
-        # listen       unix:%%TESTDIR%%/unix.sock;
 
         location /allow_all {
             allow all;
@@ -67,7 +66,7 @@ http {
 
 EOF
 
-$t->try_run('no inet6 support')->plan(12);
+$t->try_run('no inet6 support')->plan(10);
 
 ###############################################################################
 
