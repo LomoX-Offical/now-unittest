@@ -23,7 +23,6 @@ select STDOUT; $| = 1;
 
 eval { require FCGI; };
 plan(skip_all => 'FCGI not installed') if $@;
-plan(skip_all => 'win32') if $^O eq 'MSWin32';
 
 my $t = Test::Nginx->new()->has(qw/http fastcgi/)->plan(7)
 	->write_file_expand('nginx.conf', <<'EOF');
@@ -79,7 +78,7 @@ like(http_get('/var?b=u'), qr/SEE-THIS/, 'fastcgi with variables to upstream');
 ###############################################################################
 
 sub fastcgi_daemon {
-	my $socket = FCGI::OpenSocket('127.0.0.1:8081', 5);
+	my $socket = FCGI::OpenSocket('localhost:8081', 5);
 	my $request = FCGI::Request(\*STDIN, \*STDOUT, \*STDERR, \%ENV,
 		$socket);
 
