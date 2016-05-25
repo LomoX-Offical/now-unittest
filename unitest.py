@@ -37,8 +37,10 @@ def walk_dir(dir, py_path, topdown = True):
             process = subprocess.Popen(args = cmd_line, stderr = subprocess.PIPE, stdout = subprocess.PIPE);
             out, err = process.communicate();
 
-            txt = os.path.join(name) + '\nout:\n' + out;
-            txt += '\nerror:\n' + err;
+            txt = '\n---\n';
+            txt += '\nname:' + os.path.join(name);
+            txt += '\nout:\n' + out;
+            txt += '\nerr:\n' + err;
 
             log = open(logfile, 'a');
             log.write(txt);
