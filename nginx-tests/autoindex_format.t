@@ -23,7 +23,7 @@ use Test::Nginx;
 select STDERR; $| = 1;
 select STDOUT; $| = 1;
 
-my $t = Test::Nginx->new()->has(qw/http autoindex symlink/)->plan(37)
+my $t = Test::Nginx->new()->has(qw/http autoindex/)->plan(23)
 	->write_file_expand('nginx.conf', <<'EOF');
 
 %%TEST_GLOBALS%%
@@ -62,14 +62,14 @@ EOF
 my $d = $t->testdir();
 
 mkdir("$d/test-dir");
-symlink("$d/test-dir", "$d/test-dir-link");
+#symlink("$d/test-dir", "$d/test-dir-link");
 
 $t->write_file('test-file', 'x' x 42);
-symlink("$d/test-file", "$d/test-file-link");
+#symlink("$d/test-file", "$d/test-file-link");
 
 $t->write_file('test-\'-quote', '');
-$t->write_file('test-"-double', '');
-$t->write_file('test-<>-angle', '');
+#$t->write_file('test-"-double', '');
+#$t->write_file('test-<>-angle', '');
 
 mkdir($d . '/utf8');
 $t->write_file('utf8/test-utf8-' . ("\xd1\x84" x 3), '');
@@ -94,21 +94,21 @@ like($r, qr!<directory(\s+\w+="[^=]*?")+\s*>test-dir</directory>!,
 like($data, $mtime, 'xml file mtime');
 like($data, qr!size="42"!, 'xml file size');
 
-($data) = $r =~ qr!<file\s+(.*?)>test-file-link</file>!;
-like($data, $mtime, 'xml file link mtime');
-like($data, qr!size="42"!, 'xml file link size');
+#($data) = $r =~ qr!<file\s+(.*?)>test-file-link</file>!;
+#like($data, $mtime, 'xml file link mtime');
+#like($data, qr!size="42"!, 'xml file link size');
 
 ($data) = $r =~ qr!<directory\s+(.*?)>test-dir</directory>!;
 like($data, $mtime, 'xml dir mtime');
 unlike($data, qr!size="\d+"!, 'xml dir size');
 
-($data) = $r =~ qr!<directory\s+(.*?)>test-dir-link</directory>!;
-like($data, $mtime, 'xml dir link mtime');
-unlike($data, qr!size="\d+"!, 'xml dir link size');
+#($data) = $r =~ qr!<directory\s+(.*?)>test-dir-link</directory>!;
+#like($data, $mtime, 'xml dir link mtime');
+#unlike($data, qr!size="\d+"!, 'xml dir link size');
 
 like($r, qr!<file.*?>test-\'-quote</file>!, 'xml quote');
-like($r, qr!<file.*?>test-\&quot;-double</file>!, 'xml double');
-like($r, qr!<file.*?>test-&lt;&gt;-angle</file>!, 'xml angle');
+#like($r, qr!<file.*?>test-\&quot;-double</file>!, 'xml double');
+#like($r, qr!<file.*?>test-&lt;&gt;-angle</file>!, 'xml angle');
 
 
 $r = http_get('/json/');
@@ -126,24 +126,24 @@ like($data, qr!"type"\s*:\s*"file"!, 'json file');
 like($data, $mtime, 'json file mtime');
 like($data, qr!"size"\s*:\s*42!, 'json file size');
 
-($data) = $r =~ qr!({[^}]*?"name"\s*:\s*"test-file-link".*?})!;
-like($data, qr!"type"\s*:\s*"file"!, 'json file link');
-like($data, $mtime, 'json file link mtime');
-like($data, qr!"size"\s*:\s*42!, 'json file link size');
+#($data) = $r =~ qr!({[^}]*?"name"\s*:\s*"test-file-link".*?})!;
+#like($data, qr!"type"\s*:\s*"file"!, 'json file link');
+#like($data, $mtime, 'json file link mtime');
+#like($data, qr!"size"\s*:\s*42!, 'json file link size');
 
 ($data) = $r =~ qr!({[^}]*?"name"\s*:\s*"test-dir".*?})!;
 like($data, qr!"type"\s*:\s*"directory"!, 'json dir');
 like($data, $mtime, 'json dir mtime');
 unlike($data, qr!"size"\s*:\s*$number!, 'json dir size');
 
-($data) = $r =~ qr!({[^}]*?"name"\s*:\s*"test-dir-link".*?})!;
-like($data, qr!"type"\s*:\s*"directory"!, 'json dir link');
-like($data, $mtime, 'json dir link mtime');
-unlike($data, qr!"size"\s*:\s*$number!, 'json dir link size');
+#($data) = $r =~ qr!({[^}]*?"name"\s*:\s*"test-dir-link".*?})!;
+#like($data, qr!"type"\s*:\s*"directory"!, 'json dir link');
+#like($data, $mtime, 'json dir link mtime');
+#unlike($data, qr!"size"\s*:\s*$number!, 'json dir link size');
 
 like($r, qr!"name"\s*:\s*"test-'-quote"!, 'json quote');
-like($r, qr!"name"\s*:\s*"test-\\\"-double"!, 'json double');
-like($r, qr!"name"\s*:\s*"test-<>-angle"!, 'json angle');
+#like($r, qr!"name"\s*:\s*"test-\\\"-double"!, 'json double');
+#like($r, qr!"name"\s*:\s*"test-<>-angle"!, 'json angle');
 
 like(http_get_body('/jsonp/test-dir/?callback=foo'),
 	qr/^\s*foo\s*\(\s*\[\s*\]\s*\)\s*;\s*$/ms, 'jsonp callback');
