@@ -68,7 +68,6 @@ stream {
     server {
         listen       127.0.0.1:8081;
         listen       [::1]:8080;
-        # listen       unix:%%TESTDIR%%/unix.sock.0;
         proxy_pass   127.0.0.1:8080;
         allow        all;
     }
@@ -76,7 +75,6 @@ stream {
     server {
         listen       127.0.0.1:8084;
         listen       [::1]:8081;
-        # listen       unix:%%TESTDIR%%/unix.sock.1;
         proxy_pass   127.0.0.1:8080;
         deny         all;
     }
