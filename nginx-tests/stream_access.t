@@ -55,7 +55,6 @@ stream {
         proxy_pass   [::1]:8083;
     }
 
-
     server {
         listen       127.0.0.1:8094;
         proxy_pass   [::1]:8084;
@@ -69,6 +68,7 @@ stream {
     server {
         listen       127.0.0.1:8081;
         listen       [::1]:8080;
+        # listen       unix:%%TESTDIR%%/unix.sock.0;
         proxy_pass   127.0.0.1:8080;
         allow        all;
     }
@@ -76,8 +76,15 @@ stream {
     server {
         listen       127.0.0.1:8084;
         listen       [::1]:8081;
+        # listen       unix:%%TESTDIR%%/unix.sock.1;
         proxy_pass   127.0.0.1:8080;
         deny         all;
+    }
+
+    server {
+        listen       127.0.0.1:8087;
+        listen       [::1]:8082;
+        proxy_pass   127.0.0.1:8080;
     }
 
     server {
@@ -94,6 +101,11 @@ stream {
         deny         ::1;
     }
 
+    server {
+        listen       127.0.0.1:8096;
+        listen       [::1]:8085;
+        proxy_pass   127.0.0.1:8080;
+    }
 }
 
 EOF
@@ -116,6 +128,11 @@ is(stream('127.0.0.1:8082')->io($str), $str, 'inet6 allow all');
 is(stream('127.0.0.1:8084')->io($str), '', 'inet deny all');
 is(stream('127.0.0.1:8085')->io($str), '', 'inet6 deny all');
 
+# allow unix
+
+is(stream('127.0.0.1:8087')->io($str), $str, 'inet allow unix');
+is(stream('127.0.0.1:8088')->io($str), $str, 'inet6 allow unix');
+
 # deny inet
 
 is(stream('127.0.0.1:8090')->io($str), '', 'inet deny inet');
@@ -126,6 +143,10 @@ is(stream('127.0.0.1:8091')->io($str), $str, 'inet6 deny inet');
 is(stream('127.0.0.1:8093')->io($str), $str, 'inet deny inet6');
 is(stream('127.0.0.1:8094')->io($str), '', 'inet6 deny inet6');
 
+# deny unix
+
+is(stream('127.0.0.1:8096')->io($str), $str, 'inet deny unix');
+is(stream('127.0.0.1:8097')->io($str), $str, 'inet6 deny unix');
 ###############################################################################
 
 sub stream_daemon {
