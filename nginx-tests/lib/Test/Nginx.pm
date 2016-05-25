@@ -95,9 +95,9 @@ sub DESTROY {
 	if ($ENV{TEST_NGINX_CATLOG}) {
 		system("cat $self->{_testdir}/error.log");
 	}
-	if (not $ENV{TEST_NGINX_LEAVE}) {
-		eval { rmtree($self->{_testdir}); };
-	}
+	# if (not $ENV{TEST_NGINX_LEAVE}) {
+		# eval { rmtree($self->{_testdir}); };
+	# }
 }
 
 sub has($;) {
