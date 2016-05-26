@@ -21,7 +21,7 @@ use Test::Nginx;
 select STDERR; $| = 1;
 select STDOUT; $| = 1;
 
-my $t = Test::Nginx->new()->has(qw/http sub ssi xslt/)->plan(2)
+my $t = Test::Nginx->new()->has(qw/http sub ssi/)->plan(1)
 	->write_file_expand('nginx.conf', <<'EOF');
 
 %%TEST_GLOBALS%%
@@ -48,12 +48,6 @@ http {
             sub_filter notfoo bar;
         }
 
-        location /xslt {
-            ssi on;
-            sub_filter_types *;
-            sub_filter root>foo bar;
-            xslt_stylesheet test.xslt;
-        }
     }
 }
 
@@ -80,6 +74,5 @@ $t->run();
 ###############################################################################
 
 like(http_get('/index.html'), qr/not truncated/, 'subrequest partial match');
-like(http_get('/xslt.html'), qr/not.*truncated/ms, 'partial match and xslt');
 
 ###############################################################################
