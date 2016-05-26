@@ -26,7 +26,7 @@ use IO::Socket;
 use POSIX qw/ waitpid WNOHANG /;
 use Socket qw/ CRLF /;
 use Test::More qw//;
-
+use Cwd;
 ###############################################################################
 
 our $NGINX = defined $ENV{TEST_NGINX_BINARY} ? $ENV{TEST_NGINX_BINARY}
@@ -38,8 +38,9 @@ sub new {
 
 	$self->{_pid} = $$;
 	$self->{_alerts} = 1;
-
-	$self->{_testdir} = '../temp';
+	
+	my $cwd = getcwd();
+	$self->{_testdir} = $cwd . '/temp';
 	mkdir "$self->{_testdir}";
 	
 	#tempdir(
