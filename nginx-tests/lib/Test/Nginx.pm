@@ -27,6 +27,7 @@ use POSIX qw/ waitpid WNOHANG /;
 use Socket qw/ CRLF /;
 use Test::More qw//;
 use Cwd;
+use File::Basename;
 ###############################################################################
 
 our $NGINX = defined $ENV{TEST_NGINX_BINARY} ? $ENV{TEST_NGINX_BINARY}
@@ -40,7 +41,7 @@ sub new {
 	$self->{_alerts} = 1;
 	
 	my $cwd = getcwd();
-	$self->{_testdir} = $cwd . '/temp';
+	$self->{_testdir} = dirname($cwd) . '/temp';
 	mkdir "$self->{_testdir}";
 	
 	#tempdir(
@@ -96,9 +97,9 @@ sub DESTROY {
 	if ($ENV{TEST_NGINX_CATLOG}) {
 		system("cat $self->{_testdir}/error.log");
 	}
-	# if (not $ENV{TEST_NGINX_LEAVE}) {
-		# eval { rmtree($self->{_testdir}); };
-	# }
+	if (not $ENV{TEST_NGINX_LEAVE}) {
+		eval { rmtree($self->{_testdir}); };
+	}
 }
 
 sub has($;) {
