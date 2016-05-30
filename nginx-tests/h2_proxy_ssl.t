@@ -23,8 +23,8 @@ use Test::Nginx::HTTP2 qw/ :DEFAULT :frame /;
 select STDERR; $| = 1;
 select STDOUT; $| = 1;
 
-my $t = Test::Nginx->new()->has(qw/http http_ssl http_v2 proxy/)
-	->has_daemon('openssl')->plan(1);
+my $t = Test::Nginx->new()->has(qw/http http_ssl http_v2 proxy/)->plan(1);
+	#->has_daemon('openssl')->plan(1);
 
 $t->todo_alerts() unless $t->has_version('1.9.14');
 
@@ -69,9 +69,9 @@ my $d = $t->testdir();
 
 foreach my $name ('localhost') {
 	system('openssl req -x509 -new '
-		. "-config '$d/openssl.conf' -subj '/CN=$name/' "
-		. "-out '$d/$name.crt' -keyout '$d/$name.key' "
-		. ">>$d/openssl.out 2>&1") == 0
+		. "-config \"$d/openssl.conf\" -subj \"/CN=$name/\" "
+		. "-out \"$d/$name.crt\" -keyout \"$d/$name.key\" "
+		. ">> \"$d/openssl.out\" 2>&1") == 0
 		or die "Can't create certificate for $name: $!\n";
 }
 

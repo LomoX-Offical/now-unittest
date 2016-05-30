@@ -28,8 +28,8 @@ plan(skip_all => 'IO::Socket::SSL not installed') if $@;
 eval { IO::Socket::SSL::SSL_VERIFY_NONE(); };
 plan(skip_all => 'IO::Socket::SSL too old') if $@;
 
-my $t = Test::Nginx->new()->has(qw/http http_ssl http_v2 rewrite/)
-	->has_daemon('openssl')->plan(8);
+my $t = Test::Nginx->new()->has(qw/http http_ssl http_v2 rewrite/)->plan(8);
+	#->has_daemon('openssl')->plan(8);
 
 $t->write_file_expand('nginx.conf', <<'EOF');
 
@@ -79,9 +79,9 @@ my $d = $t->testdir();
 
 foreach my $name ('localhost') {
 	system('openssl req -x509 -new '
-		. "-config '$d/openssl.conf' -subj '/CN=$name/' "
-		. "-out '$d/$name.crt' -keyout '$d/$name.key' "
-		. ">>$d/openssl.out 2>&1") == 0
+		. "-config \"$d/openssl.conf\" -subj \"/CN=$name/\" "
+		. "-out \"$d/$name.crt\" -keyout \"$d/$name.key\" "
+		. ">> \"$d/openssl.out\" 2>&1") == 0
 		or die "Can't create certificate for $name: $!\n";
 }
 
