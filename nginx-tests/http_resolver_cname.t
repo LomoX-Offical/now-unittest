@@ -41,17 +41,17 @@ http {
         server_name  localhost;
 
         location /short {
-            resolver    127.0.0.1:8081;
+            resolver    127.0.0.1:%%PORT_8081_UDP%%;
             resolver_timeout 2s;
 
-            proxy_pass  http://$host:8080/t;
+            proxy_pass  http://$host:%%PORT_8080%%/t;
         }
 
         location /long {
-            resolver    127.0.0.1:8081;
+            resolver    127.0.0.1:%%PORT_8081_UDP%%;
             resolver_timeout 5s;
 
-            proxy_pass  http://$host:8080/t;
+            proxy_pass  http://$host:%%PORT_8080%%/t;
         }
 
         location / { }
@@ -60,12 +60,12 @@ http {
 
 EOF
 
-$t->run_daemon(\&dns_daemon, 8081, $t);
+$t->run_daemon(\&dns_daemon, port(8081), $t);
 
 $t->write_file('t', '');
 $t->run();
 
-$t->waitforfile($t->testdir . '/8081');
+$t->waitforfile($t->testdir . '/' . port(8081));
 
 ###############################################################################
 
@@ -164,7 +164,7 @@ sub reply_handler {
 	use constant A		=> 1;
 	use constant CNAME	=> 5;
 
-	use constant IN 	=> 1;
+	use constant IN		=> 1;
 
 	# default values
 
@@ -261,9 +261,9 @@ sub dns_daemon {
 
 	my ($data, $recv_data);
 	my $socket = IO::Socket::INET->new(
-		LocalAddr    => '127.0.0.1',
-		LocalPort    => $port,
-		Proto        => 'udp',
+		LocalAddr => '127.0.0.1',
+		LocalPort => $port,
+		Proto => 'udp',
 	)
 		or die "Can't create listening socket: $!\n";
 

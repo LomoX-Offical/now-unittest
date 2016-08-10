@@ -18,7 +18,7 @@ BEGIN { use FindBin; chdir($FindBin::Bin); }
 
 use lib 'lib';
 use Test::Nginx;
-use Test::Nginx::HTTP2 qw/ :DEFAULT :frame :io /;
+use Test::Nginx::HTTP2;
 
 ###############################################################################
 
@@ -41,6 +41,7 @@ http {
 
     server {
         listen       127.0.0.1:8080 http2;
+        listen       127.0.0.1:8082;
         server_name  localhost;
 
         location / {
@@ -54,6 +55,11 @@ http {
             proxy_pass http://127.0.0.1:8081/;
             client_body_buffer_size 1k;
         }
+        location /abort {
+            proxy_request_buffering off;
+            proxy_http_version 1.1;
+            proxy_pass http://127.0.0.1:8082/;
+        }
     }
 }
 
@@ -65,7 +71,7 @@ my $f = get_body('/chunked');
 plan(skip_all => 'no unbuffered request body') unless $f;
 $f->{http_end}();
 
-$t->plan(70);
+$t->plan(49);
 
 ###############################################################################
 
@@ -74,62 +80,42 @@ $t->plan(70);
 $f = get_body('/', 'content-length' => 10);
 ok($f->{headers}, 'request');
 is($f->{upload}('01234', body_more => 1), '01234', 'part');
-is($f->{window}, 10, 'part - window');
 is($f->{upload}('56789'), '56789', 'part 2');
-is($f->{window}, 5, 'part 2 - window');
 is($f->{http_end}(), 200, 'response');
 
 $f = get_body('/', 'content-length' => 10);
 ok($f->{headers}, 'much');
 is($f->{upload}('0123456789', body_more => 1), '0123456789', 'much - part');
-is($f->{window}, 10, 'much - part - window');
 is($f->{upload}('many'), '', 'much - part 2');
-is($f->{window}, 10, 'much - part 2 - window');
 is($f->{http_end}(), 400, 'much - response');
 
 $f = get_body('/', 'content-length' => 10);
 ok($f->{headers}, 'less');
 is($f->{upload}('0123', body_more => 1), '0123', 'less - part');
-is($f->{window}, 10, 'less - part - window');
 is($f->{upload}('56789'), '', 'less - part 2');
-is($f->{window}, 4, 'less - part 2 - window');
 is($f->{http_end}(), 400, 'less - response');
 
 $f = get_body('/', 'content-length' => 18);
 ok($f->{headers}, 'many');
 is($f->{upload}('01234many', body_split => [ 5 ], body_more => 1),
 	'01234many', 'many - part');
-is($f->{window}, 18, 'many - part - window');
 is($f->{upload}('56789many', body_split => [ 5 ]),
 	'56789many', 'many - part 2');
-is($f->{window}, 9, 'many - part 2 - window');
 is($f->{http_end}(), 200, 'many - response');
 
 $f = get_body('/', 'content-length' => 0);
 ok($f->{headers}, 'empty');
-is($f->{upload}('', body_more => 1), '', 'empty - part');
-
-TODO: {
-local $TODO = 'not yet' unless $t->has_version('1.9.15');
-
-is($f->{window}, undef, 'empty - part - window');
-
-}
-
-is($f->{upload}(''), '', 'empty - part 2');
-is($f->{window}, undef, 'empty - part 2 - window');
+is($f->{upload}('', body_more => 1, wait => 0.2), '', 'empty - part');
+is($f->{upload}('', wait => 0.2), '', 'empty - part 2');
 is($f->{http_end}(), 200, 'empty - response');
 
 $f = get_body('/', 'content-length' => 1536);
 ok($f->{headers}, 'buffer');
 is($f->{upload}('0123' x 128, body_more => 1), '0123' x 128,
 	'buffer - below');
-is($f->{window}, 1024, 'buffer - below - window');
 is($f->{upload}('4567' x 128, body_more => 1), '4567' x 128,
 	'buffer - equal');
-is($f->{window}, 512, 'buffer - equal - window');
 is($f->{upload}('89AB' x 128), '89AB' x 128, 'buffer - above');
-is($f->{window}, 512, 'buffer - above - window');
 is($f->{http_end}(), 200, 'buffer - response');
 
 $f = get_body('/', 'content-length' => 10);
@@ -143,43 +129,34 @@ $f = get_body('/chunked');
 ok($f->{headers}, 'chunked');
 is($f->{upload}('01234', body_more => 1), '5' . CRLF . '01234' . CRLF,
 	'chunked - part');
-is($f->{window}, 1024, 'chunked - part - window');
 is($f->{upload}('56789'), '5' . CRLF . '56789' . CRLF . '0' . CRLF . CRLF,
 	'chunked - part 2');
-is($f->{window}, 5, 'chunked - part 2 - window');
 is($f->{http_end}(), 200, 'chunked - response');
 
 $f = get_body('/chunked');
 ok($f->{headers}, 'chunked buffer');
 is($f->{upload}('0123' x 128, body_more => 1),
 	'200' . CRLF . '0123' x 128 . CRLF, 'chunked buffer - below');
-is($f->{window}, 1024, 'chunked buffer - below - window');
 is($f->{upload}('4567' x 128, body_more => 1),
 	'200' . CRLF . '4567' x 128 . CRLF, 'chunked buffer - equal');
-is($f->{window}, 512, 'chunked buffer - equal - window');
 is($f->{upload}('89AB' x 128),
 	'200' . CRLF . '89AB' x 128 . CRLF . '0' . CRLF . CRLF,
 	'chunked buffer - above');
-is($f->{window}, 512, 'chunked buffer - above - window');
 is($f->{http_end}(), 200, 'chunked buffer - response');
 
 $f = get_body('/chunked');
 ok($f->{headers}, 'chunked many');
 is($f->{upload}('01234many', body_split => [ 5 ], body_more => 1),
 	'9' . CRLF . '01234many' . CRLF, 'chunked many - part');
-is($f->{window}, 1024, 'chunked many - part - window');
 is($f->{upload}('56789many', body_split => [ 5 ]),
 	'9' . CRLF . '56789many' . CRLF . '0' . CRLF . CRLF,
 	'chunked many - part 2');
-is($f->{window}, 9, 'chunked many - part 2 - window');
 is($f->{http_end}(), 200, 'chunked many - response');
 
 $f = get_body('/chunked');
 ok($f->{headers}, 'chunked empty');
-is($f->{upload}('', body_more => 1), '', 'chunked empty - part');
-is($f->{window}, 1024, 'chunked empty - part - window');
+is($f->{upload}('', body_more => 1, wait => 0.2), '', 'chunked empty - part');
 is($f->{upload}(''), '0' . CRLF . CRLF, 'chunked empty - part 2');
-is($f->{window}, undef, 'chunked empty - part 2 - window');
 is($f->{http_end}(), 200, 'chunked empty - response');
 
 $f = get_body('/chunked');
@@ -188,6 +165,26 @@ is($f->{upload}('0123456789', split => [ 14 ]),
 	'5' . CRLF . '01234' . CRLF . '5' . CRLF . '56789' . CRLF .
 	'0' . CRLF . CRLF, 'chunked split');
 is($f->{http_end}(), 200, 'chunked split - response');
+
+# unbuffered request body, chunked transfer-encoding
+# client sends partial DATA frame and closes connection
+
+TODO: {
+todo_skip 'use-after-free', 1 unless $ENV{TEST_NGINX_UNSAFE}
+	or $t->has_version('1.11.2');
+
+my $s = Test::Nginx::HTTP2->new();
+my $s2 = Test::Nginx::HTTP2->new();
+
+$s->new_stream({ path => '/abort', body_more => 1 });
+$s->h2_body('TEST', { split => [ 9 ], abort => 1 });
+
+close $s->{socket};
+
+$s2->h2_ping('PING');
+isnt(@{$s2->read()}, 0, 'chunked abort');
+
+}
 
 ###############################################################################
 
@@ -198,16 +195,16 @@ sub get_body {
 	$server = IO::Socket::INET->new(
 		Proto => 'tcp',
 		LocalHost => '127.0.0.1',
-		LocalPort => 8081,
+		LocalPort => port(8081),
 		Listen => 5,
 		Timeout => 3,
 		Reuse => 1
 	)
 		or die "Can't create listening socket: $!\n";
 
-	my $sess = new_session(8080);
+	my $s = Test::Nginx::HTTP2->new();
 	my $sid = exists $extra{'content-length'}
-		? new_stream($sess, { headers => [
+		? $s->new_stream({ headers => [
 			{ name => ':method', value => 'GET' },
 			{ name => ':scheme', value => 'http' },
 			{ name => ':path', value => $url, },
@@ -215,44 +212,37 @@ sub get_body {
 			{ name => 'content-length',
 				value => $extra{'content-length'} }],
 			body_more => 1 })
-		: new_stream($sess, { path => $url, body_more => 1 });
+		: $s->new_stream({ path => $url, body_more => 1 });
 
 	$client = $server->accept() or return;
 
 	log2c("(new connection $client)");
 
-	$f->{headers} = raw_read($client, '', 1, \&log2i);
+	$f->{headers} = backend_read($client);
 
 	my $chunked = $f->{headers} =~ /chunked/;
 
-	my $body_read = sub {
-		my ($s, $buf, $len) = @_;
+	$f->{upload} = sub {
+		my ($body, %extra) = @_;
+		my $len = length($body);
+		my $wait = $extra{wait};
+
+		$s->h2_body($body, { %extra });
+
+		$body = '';
 
 		for (1 .. 10) {
-			$buf = raw_read($s, $buf, length($buf) + 1, \&log2i)
-				or return '';
+			my $buf = backend_read($client, $wait) or return '';
+			$body .= $buf;
 
 			my $got = 0;
 			$got += $chunked ? hex $_ : $_ for $chunked
-				? $buf =~ /(\w+)\x0d\x0a?\w+\x0d\x0a?/g
-				: length($buf);
+				? $body =~ /(\w+)\x0d\x0a?\w+\x0d\x0a?/g
+				: length($body);
 			last if $got >= $len;
 		}
 
-		return $buf;
-	};
-
-	$f->{upload} = sub {
-		my ($body, %extra) = @_;
-
-		my $frames = h2_read($sess,
-			all => [{ type => 'WINDOW_UPDATE' }]);
-		my ($frame) = grep { $_->{type} eq "WINDOW_UPDATE" } @$frames;
-		$f->{window} = $frame->{wdelta};
-
-		h2_body($sess, $body, { %extra });
-
-		return $body_read->($client, '', length($body));
+		return $body;
 	};
 	$f->{http_end} = sub {
 		$client->write(<<EOF);
@@ -263,11 +253,22 @@ EOF
 
 		$client->close;
 
-		my $frames = h2_read($sess, all => [{ sid => $sid, fin => 1 }]);
+		my $frames = $s->read(all => [{ sid => $sid, fin => 1 }]);
 		my ($frame) = grep { $_->{type} eq "HEADERS" } @$frames;
 		return $frame->{headers}->{':status'};
 	};
 	return $f;
+}
+
+sub backend_read {
+	my ($s, $timo) = @_;
+	my $buf = '';
+
+	if (IO::Select->new($s)->can_read($timo || 3)) {
+		$s->sysread($buf, 16384) or return;
+		log2i($buf);
+	}
+	return $buf;
 }
 
 sub log2i { Test::Nginx::log_core('|| <<', @_); }

@@ -39,22 +39,22 @@ events {
 stream {
     server {
         listen          127.0.0.1:8080;
-        proxy_pass      [::1]:8080;
+        proxy_pass      [::1]:%%PORT_8080%%;
     }
 
     server {
         listen          127.0.0.1:8081;
-        proxy_pass      [::1]:8081;
+        proxy_pass      [::1]:%%PORT_8081%%;
     }
 
     server {
-        listen          [::1]:8080;
+        listen          [::1]:%%PORT_8080%%;
         proxy_pass      127.0.0.1:8082;
         proxy_protocol  on;
     }
 
     server {
-        listen          [::1]:8081;
+        listen          [::1]:%%PORT_8081%%;
         proxy_pass      127.0.0.1:8082;
     }
 }
@@ -63,20 +63,23 @@ EOF
 
 $t->run_daemon(\&stream_daemon);
 $t->try_run('no inet6 support or stream proxy_protocol')->plan(2);
-$t->waitforsocket('127.0.0.1:8082');
+$t->waitforsocket('127.0.0.1:' . port(8082));
 
 ###############################################################################
 
-like(stream()->io('close'), qr/PROXY TCP6 ::1 ::1 \d+ 8080$CRLF/,
-	'protocol on');
-unlike(stream('127.0.0.1:8081')->io('close'), qr/PROXY/, 'protocol off');
+my $dp = port(8080);
+
+like(stream('127.0.0.1:' . $dp)->io('close'),
+	qr/PROXY TCP6 ::1 ::1 \d+ $dp$CRLF/, 'protocol on');
+unlike(stream('127.0.0.1:' . port(8081))->io('close'), qr/PROXY/,
+	'protocol off');
 
 ###############################################################################
 
 sub stream_daemon {
 	my $server = IO::Socket::INET->new(
 		Proto => 'tcp',
-		LocalHost => '127.0.0.1:8082',
+		LocalHost => '127.0.0.1:' . port(8082),
 		Listen => 5,
 		Reuse => 1
 	)

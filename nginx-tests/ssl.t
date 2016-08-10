@@ -48,7 +48,7 @@ http {
     ssl_session_tickets off;
 
     server {
-        listen       127.0.0.1:8443 ssl;
+        listen       127.0.0.1:8085 ssl;
         listen       127.0.0.1:8080;
         server_name  localhost;
 
@@ -150,39 +150,39 @@ $t->run();
 
 ###############################################################################
 
-like(http_get('/reuse', socket => get_ssl_socket($ctx)), qr/^body \.$/m,
-	'shared initial session');
-like(http_get('/reuse', socket => get_ssl_socket($ctx)), qr/^body r$/m,
-	'shared session reused');
+like(http_get('/reuse', socket => get_ssl_socket($ctx, port(8085))),
+	qr/^body \.$/m, 'shared initial session');
+like(http_get('/reuse', socket => get_ssl_socket($ctx, port(8085))),
+	qr/^body r$/m, 'shared session reused');
 
-like(http_get('/', socket => get_ssl_socket($ctx, 8081)), qr/^body \.$/m,
+like(http_get('/', socket => get_ssl_socket($ctx, port(8081))), qr/^body \.$/m,
 	'builtin initial session');
-like(http_get('/', socket => get_ssl_socket($ctx, 8081)), qr/^body r$/m,
+like(http_get('/', socket => get_ssl_socket($ctx, port(8081))), qr/^body r$/m,
 	'builtin session reused');
 
-like(http_get('/', socket => get_ssl_socket($ctx, 8082)), qr/^body \.$/m,
+like(http_get('/', socket => get_ssl_socket($ctx, port(8082))), qr/^body \.$/m,
 	'builtin size initial session');
-like(http_get('/', socket => get_ssl_socket($ctx, 8082)), qr/^body r$/m,
+like(http_get('/', socket => get_ssl_socket($ctx, port(8082))), qr/^body r$/m,
 	'builtin size session reused');
 
-like(http_get('/', socket => get_ssl_socket($ctx, 8083)), qr/^body \.$/m,
+like(http_get('/', socket => get_ssl_socket($ctx, port(8083))), qr/^body \.$/m,
 	'reused none initial session');
-like(http_get('/', socket => get_ssl_socket($ctx, 8083)), qr/^body \.$/m,
+like(http_get('/', socket => get_ssl_socket($ctx, port(8083))), qr/^body \.$/m,
 	'session not reused 1');
 
-like(http_get('/', socket => get_ssl_socket($ctx, 8084)), qr/^body \.$/m,
+like(http_get('/', socket => get_ssl_socket($ctx, port(8084))), qr/^body \.$/m,
 	'reused off initial session');
-like(http_get('/', socket => get_ssl_socket($ctx, 8084)), qr/^body \.$/m,
+like(http_get('/', socket => get_ssl_socket($ctx, port(8084))), qr/^body \.$/m,
 	'session not reused 2');
 
 # ssl certificate inheritance
 
-my $s = get_ssl_socket($ctx, 8081);
+my $s = get_ssl_socket($ctx, port(8081));
 like($s->dump_peer_certificate(), qr/CN=localhost/, 'CN');
 
 $s->close();
 
-$s = get_ssl_socket($ctx);
+$s = get_ssl_socket($ctx, port(8085));
 like($s->dump_peer_certificate(), qr/CN=inner/, 'CN inner');
 
 $s->close();
@@ -191,23 +191,24 @@ $s->close();
 
 select undef, undef, undef, 2.1;
 
-like(http_get('/', socket => get_ssl_socket($ctx, 8081)), qr/^body \.$/m,
+like(http_get('/', socket => get_ssl_socket($ctx, port(8081))), qr/^body \.$/m,
 	'session timeout');
 
 # embedded variables
 
-my ($sid) = http_get('/id', socket => get_ssl_socket($ctx)) =~ /^body (\w+)$/m;
+my ($sid) = http_get('/id',
+	socket => get_ssl_socket($ctx, port(8085))) =~ /^body (\w+)$/m;
 is(length $sid, 64, 'session id');
 
 unlike(http_get('/id'), qr/body \w/, 'session id no ssl');
 
-like(http_get('/cipher', socket => get_ssl_socket($ctx)),
+like(http_get('/cipher', socket => get_ssl_socket($ctx, port(8085))),
 	qr/^body [\w-]+$/m, 'cipher');
 
-like(http_get('/client_verify', socket => get_ssl_socket($ctx)),
+like(http_get('/client_verify', socket => get_ssl_socket($ctx, port(8085))),
 	qr/^body NONE$/m, 'client verify');
 
-like(http_get('/protocol', socket => get_ssl_socket($ctx)),
+like(http_get('/protocol', socket => get_ssl_socket($ctx, port(8085))),
 	qr/^body (TLS|SSL)v(\d|\.)+$/m, 'protocol');
 
 ###############################################################################
@@ -223,7 +224,7 @@ sub get_ssl_socket {
 		$s = IO::Socket::SSL->new(
 			Proto => 'tcp',
 			PeerAddr => '127.0.0.1',
-			PeerPort => $port || '8443',
+			PeerPort => $port,
 			SSL_verify_mode => IO::Socket::SSL::SSL_VERIFY_NONE(),
 			SSL_reuse_ctx => $ctx,
 			SSL_error_trap => sub { die $_[1] }

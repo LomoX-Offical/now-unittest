@@ -74,20 +74,22 @@ foreach my $name ('localhost') {
 		or die "Can't create certificate for $name: $!\n";
 }
 
-$t->run_daemon(\&stream_daemon_ssl, 8081, path => $d, pp => 1);
-$t->run_daemon(\&stream_daemon_ssl, 8083, path => $d, pp => 0);
+$t->run_daemon(\&stream_daemon_ssl, port(8081), path => $d, pp => 1);
+$t->run_daemon(\&stream_daemon_ssl, port(8083), path => $d, pp => 0);
 $t->try_run('no stream proxy_protocol')->plan(2);
 
-$t->waitforsocket('127.0.0.1:8081');
-$t->waitforsocket('127.0.0.1:8083');
+$t->waitforsocket('127.0.0.1:' . port(8081));
+$t->waitforsocket('127.0.0.1:' . port(8083));
 
 ###############################################################################
 
-my %r = pp_get('test');
-is($r{'data'}, "PROXY TCP4 127.0.0.1 127.0.0.1 $r{'sp'} 8080" . CRLF . 'test',
+my $dp = port(8080);
+
+my %r = pp_get('test', '127.0.0.1:' . $dp);
+is($r{'data'}, "PROXY TCP4 127.0.0.1 127.0.0.1 $r{'sp'} $dp" . CRLF . 'test',
 	'protocol on');
 
-%r = pp_get('test', '127.0.0.1:8082');
+%r = pp_get('test', '127.0.0.1:' . port(8082));
 is($r{'data'}, 'test', 'protocol off');
 
 ###############################################################################
@@ -105,7 +107,7 @@ sub getconn {
 	my $peer = shift;
 	my $s = IO::Socket::INET->new(
 		Proto => 'tcp',
-		PeerAddr => $peer || '127.0.0.1:8080'
+		PeerAddr => $peer
 	)
 		or die "Can't connect to nginx: $!\n";
 

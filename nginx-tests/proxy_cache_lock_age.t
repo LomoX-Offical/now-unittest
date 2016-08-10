@@ -56,8 +56,8 @@ http {
 
 EOF
 
-$t->run_daemon(\&http_daemon, 8081);
-$t->run()->waitforsocket('127.0.0.1:8081');
+$t->run_daemon(\&http_daemon, port(8081));
+$t->run()->waitforsocket('127.0.0.1:' . port(8081));
 
 ###############################################################################
 

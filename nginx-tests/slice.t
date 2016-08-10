@@ -228,7 +228,7 @@ SKIP: {
 	skip 'win32', 5 if $^O eq 'MSWin32';
 
 	$t->run_daemon(\&fastcgi_daemon);
-	$t->waitforsocket('127.0.0.1:8082');
+	$t->waitforsocket('127.0.0.1:' . port(8082));
 
 	like(http_get('/fastcgi'), qr/200 OK.*MISS.*^012345678$/ms, 'fastcgi');
 	like(http_get('/fastcgi'), qr/200 OK.*HIT.*^012345678$/ms,
@@ -258,7 +258,7 @@ EOF
 ###############################################################################
 
 sub fastcgi_daemon {
-	my $socket = FCGI::OpenSocket('127.0.0.1:8082', 5);
+	my $socket = FCGI::OpenSocket('127.0.0.1:' . port(8082), 5);
 	my $request = FCGI::Request(\*STDIN, \*STDOUT, \*STDERR, \%ENV,
 		$socket);
 

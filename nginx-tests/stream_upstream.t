@@ -37,82 +37,83 @@ events {
 
 stream {
     upstream u {
-        server 127.0.0.1:8087;
-        server 127.0.0.1:8088;
+        server 127.0.0.1:8084;
+        server 127.0.0.1:8085;
     }
 
     upstream u2 {
-        server 127.0.0.1:8089 down;
-        server 127.0.0.1:8089;
-        server 127.0.0.1:8087;
-        server 127.0.0.1:8088;
+        server 127.0.0.1:8086 down;
+        server 127.0.0.1:8086;
+        server 127.0.0.1:8084;
+        server 127.0.0.1:8085;
     }
 
     upstream u3 {
-        server 127.0.0.1:8087;
-        server 127.0.0.1:8088 weight=2;
+        server 127.0.0.1:8084;
+        server 127.0.0.1:8085 weight=2;
     }
 
     upstream u4 {
-        server 127.0.0.1:8089;
-        server 127.0.0.1:8087 backup;
+        server 127.0.0.1:8086;
+        server 127.0.0.1:8084 backup;
     }
 
     proxy_connect_timeout 1s;
 
     server {
-        listen      127.0.0.1:8081;
+        listen      127.0.0.1:8080;
         proxy_pass  u;
     }
 
     server {
-        listen      127.0.0.1:8082;
+        listen      127.0.0.1:8081;
         proxy_pass  u2;
     }
 
     server {
-        listen      127.0.0.1:8083;
+        listen      127.0.0.1:8082;
         proxy_pass  u3;
     }
 
     server {
-        listen      127.0.0.1:8084;
+        listen      127.0.0.1:8083;
         proxy_pass  u4;
     }
 }
 
 EOF
 
-$t->run_daemon(\&stream_daemon, 8087);
-$t->run_daemon(\&stream_daemon, 8088);
+$t->run_daemon(\&stream_daemon, port(8084));
+$t->run_daemon(\&stream_daemon, port(8085));
 $t->run();
 
-$t->waitforsocket('127.0.0.1:8087');
-$t->waitforsocket('127.0.0.1:8088');
+$t->waitforsocket('127.0.0.1:' . port(8084));
+$t->waitforsocket('127.0.0.1:' . port(8085));
 
 ###############################################################################
 
-is(many('.', 30, peer => '127.0.0.1:8081'), '8087: 15, 8088: 15', 'balanced');
-is(many('.', 30, peer => '127.0.0.1:8082'), '8087: 15, 8088: 15', 'failures');
-is(many('.', 30, peer => '127.0.0.1:8083'), '8087: 10, 8088: 20', 'weight');
-is(many('.', 30, peer => '127.0.0.1:8084'), '8087: 30', 'backup');
+my @ports = my ($port4, $port5) = (port(8084), port(8085));
+
+is(many(30, port(8080)), "$port4: 15, $port5: 15", 'balanced');
+is(many(30, port(8081)), "$port4: 15, $port5: 15", 'failures');
+is(many(30, port(8082)), "$port4: 10, $port5: 20", 'weight');
+is(many(30, port(8083)), "$port4: 30", 'backup');
 
 ###############################################################################
 
 sub many {
-	my ($data, $count, %opts) = @_;
-	my (%ports, $peer);
-
-	$peer = $opts{peer};
+	my ($count, $port) = @_;
+	my (%ports);
 
 	for (1 .. $count) {
-		if (stream($peer)->io($data) =~ /(\d+)/) {
+		if (stream("127.0.0.1:$port")->io('.') =~ /(\d+)/) {
 			$ports{$1} = 0 unless defined $ports{$1};
 			$ports{$1}++;
 		}
 	}
 
-	return join ', ', map { $_ . ": " . $ports{$_} } sort keys %ports;
+	my @keys = map { my $p = $_; grep { $p == $_ } keys %ports } @ports;
+	return join ', ', map { $_ . ": " . $ports{$_} } @keys;
 }
 
 ###############################################################################

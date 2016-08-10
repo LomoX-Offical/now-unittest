@@ -56,7 +56,7 @@ http {
 EOF
 
 $t->run_daemon(\&http_chunked_daemon);
-$t->run()->waitforsocket('127.0.0.1:8081');
+$t->run()->waitforsocket('127.0.0.1:' . port(8081));
 
 ###############################################################################
 
@@ -68,7 +68,7 @@ like(http_get("/"), qr/SEE-THIS.*HIT/s, "chunked cached");
 sub http_chunked_daemon {
 	my $server = IO::Socket::INET->new(
 		Proto => 'tcp',
-		LocalAddr => '127.0.0.1:8081',
+		LocalAddr => '127.0.0.1:' . port(8081),
 		Listen => 5,
 		Reuse => 1
 	)

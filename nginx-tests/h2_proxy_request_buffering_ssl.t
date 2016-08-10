@@ -18,7 +18,7 @@ BEGIN { use FindBin; chdir($FindBin::Bin); }
 
 use lib 'lib';
 use Test::Nginx;
-use Test::Nginx::HTTP2 qw/ :DEFAULT :frame :io /;
+use Test::Nginx::HTTP2;
 
 ###############################################################################
 
@@ -133,8 +133,8 @@ is($f->{http_end}(), 200, 'many - response');
 
 $f = get_body('/', 'content-length' => 0);
 ok($f->{headers}, 'empty');
-is($f->{upload}('', body_more => 1), '', 'empty - part');
-is($f->{upload}(''), '', 'empty - part 2');
+is($f->{upload}('', body_more => 1, wait => 0.2), '', 'empty - part');
+is($f->{upload}('', wait => 0.2), '', 'empty - part 2');
 is($f->{http_end}(), 200, 'empty - response');
 
 $f = get_body('/', 'content-length' => 10);
@@ -174,7 +174,7 @@ is($f->{http_end}(), 200, 'chunked many - response');
 
 $f = get_body('/chunked');
 ok($f->{headers}, 'chunked empty');
-is($f->{upload}('', body_more => 1), '', 'chunked empty - part');
+is($f->{upload}('', body_more => 1, wait => 0.2), '', 'chunked empty - part');
 is($f->{upload}(''), '0' . CRLF . CRLF, 'chunked empty - part 2');
 is($f->{http_end}(), 200, 'chunked empty - response');
 
@@ -194,16 +194,16 @@ sub get_body {
 	$server = IO::Socket::INET->new(
 		Proto => 'tcp',
 		LocalHost => '127.0.0.1',
-		LocalPort => 8081,
+		LocalPort => port(8081),
 		Listen => 5,
 		Timeout => 3,
 		Reuse => 1
 	)
 		or die "Can't create listening socket: $!\n";
 
-	my $sess = new_session(8080);
+	my $s = Test::Nginx::HTTP2->new();
 	my $sid = exists $extra{'content-length'}
-		? new_stream($sess, { headers => [
+		? $s->new_stream({ headers => [
 			{ name => ':method', value => 'GET' },
 			{ name => ':scheme', value => 'http' },
 			{ name => ':path', value => $url, },
@@ -211,39 +211,37 @@ sub get_body {
 			{ name => 'content-length',
 				value => $extra{'content-length'} }],
 			body_more => 1 })
-		: new_stream($sess, { path => $url, body_more => 1 });
+		: $s->new_stream({ path => $url, body_more => 1 });
 
 	$client = $server->accept() or return;
 
 	log2c("(new connection $client)");
 
-	$f->{headers} = raw_read($client, '', 1, \&log2i);
+	$f->{headers} = backend_read($client);
 
 	my $chunked = $f->{headers} =~ /chunked/;
 
-	my $body_read = sub {
-		my ($s, $buf, $len) = @_;
+	$f->{upload} = sub {
+		my ($body, %extra) = @_;
+		my $len = length($body);
+		my $wait = $extra{wait};
+
+		$s->h2_body($body, { %extra });
+
+		$body = '';
 
 		for (1 .. 10) {
-			$buf = raw_read($s, $buf, length($buf) + 1, \&log2i)
-				or return '';
+			my $buf = backend_read($client, $wait) or return '';
+			$body .= $buf;
 
 			my $got = 0;
 			$got += $chunked ? hex $_ : $_ for $chunked
-				? $buf =~ /(\w+)\x0d\x0a?\w+\x0d\x0a?/g
-				: length($buf);
+				? $body =~ /(\w+)\x0d\x0a?\w+\x0d\x0a?/g
+				: length($body);
 			last if $got >= $len;
 		}
 
-		return $buf;
-	};
-
-	$f->{upload} = sub {
-		my ($body, %extra) = @_;
-
-		h2_body($sess, $body, { %extra });
-
-		return $body_read->($client, '', length($body));
+		return $body;
 	};
 	$f->{http_end} = sub {
 		$client->write(<<EOF);
@@ -254,11 +252,22 @@ EOF
 
 		$client->close;
 
-		my $frames = h2_read($sess, all => [{ sid => $sid, fin => 1 }]);
+		my $frames = $s->read(all => [{ sid => $sid, fin => 1 }]);
 		my ($frame) = grep { $_->{type} eq "HEADERS" } @$frames;
 		return $frame->{headers}->{':status'};
 	};
 	return $f;
+}
+
+sub backend_read {
+	my ($s, $timo) = @_;
+	my $buf = '';
+
+	if (IO::Select->new($s)->can_read($timo || 3)) {
+		$s->sysread($buf, 16384) or return;
+		log2i($buf);
+	}
+	return $buf;
 }
 
 sub log2i { Test::Nginx::log_core('|| <<', @_); }

@@ -11,7 +11,7 @@ use strict;
 
 use base qw/ Exporter /;
 
-our @EXPORT = qw/ log_in log_out http http_get http_head /;
+our @EXPORT = qw/ log_in log_out http http_get http_head port /;
 our @EXPORT_OK = qw/ http_gzip_request http_gzip_like http_start http_end /;
 our %EXPORT_TAGS = (
 	gzip => [ qw/ http_gzip_request http_gzip_like / ]
@@ -32,6 +32,7 @@ use File::Basename;
 
 our $NGINX = defined $ENV{TEST_NGINX_BINARY} ? $ENV{TEST_NGINX_BINARY}
 	: '../nginx/objs/nginx';
+our %ports = ();
 
 sub new {
 	my $self = {};
@@ -169,9 +170,18 @@ sub has_module($) {
 		split_clients
 			=> '(?s)^(?!.*--without-http_split_clients_module)',
 		stream	=> '--with-stream((?!\S)|=dynamic)',
-		stream_access => '(?s)^(?!.*--without-stream_access_module)',
+		stream_access
+			=> '(?s)^(?!.*--without-stream_access_module)',
+		stream_geo
+			=> '(?s)^(?!.*--without-stream_geo_module)',
 		stream_limit_conn
 			=> '(?s)^(?!.*--without-stream_limit_conn_module)',
+		stream_map
+			=> '(?s)^(?!.*--without-stream_map_module)',
+		stream_return
+			=> '(?s)^(?!.*--without-stream_return_module)',
+		stream_split_clients
+			=> '(?s)^(?!.*--without-stream_split_clients_module)',
 		stream_upstream_hash
 			=> '(?s)^(?!.*--without-stream_upstream_hash_module)',
 		stream_upstream_least_conn
@@ -201,6 +211,10 @@ sub has_feature($) {
 	}
 
 	if ($feature eq 'unix') {
+		return $^O ne 'MSWin32';
+	}
+
+	if ($feature eq 'udp') {
 		return $^O ne 'MSWin32';
 	}
 
@@ -304,6 +318,43 @@ sub run(;$) {
 
 	$self->{_started} = 1;
 	return $self;
+}
+
+sub port {
+	my ($num, %opts) = @_;
+	my ($s_tcp, $s_udp, $port);
+
+	$num += 8080 if $num < 1000;
+	goto done if defined $ports{$num};
+
+	$port = $num;
+
+	for (1 .. 10) {
+		$port = 8000 + int(rand(1000)) unless $_ == 1;
+
+		$s_udp = IO::Socket::INET->new(
+			Proto => 'udp',
+			LocalAddr => '127.0.0.1:' . $port,
+		) or next;
+
+		$s_tcp = IO::Socket::INET->new(
+			Proto => 'tcp',
+			LocalAddr => '127.0.0.1:' . $port,
+			Listen => 1,
+			Reuse => ($^O ne 'MSWin32')
+		) and last;
+	}
+
+	die "Port limit exceeded" unless defined $s_tcp and defined $s_udp;
+
+	$ports{$num} = {
+		port => $port,
+		socket => $opts{udp} ? $s_tcp : $s_udp
+	};
+
+done:
+	return $ports{$num}{socket} if $opts{socket};
+	return $ports{$num}{port};
 }
 
 sub dump_config() {
@@ -429,6 +480,11 @@ sub write_file_expand($$) {
 	$content =~ s/%%TEST_GLOBALS%%/$self->test_globals()/gmse;
 	$content =~ s/%%TEST_GLOBALS_HTTP%%/$self->test_globals_http()/gmse;
 	$content =~ s/%%TESTDIR%%/$self->{_testdir}/gms;
+
+	$content =~ s/127\.0\.0\.1:(8\d\d\d)/'127.0.0.1:' . port($1)/gmse;
+
+	$content =~ s/%%PORT_(\d+)%%/port($1)/gmse;
+	$content =~ s/%%PORT_(\d+)_UDP%%/port($1, udp => 1)/gmse;
 
 	return $self->write_file($name, $content);
 }
@@ -610,7 +666,7 @@ sub http_start($;%) {
 
 		$s = $extra{socket} || IO::Socket::INET->new(
 			Proto => 'tcp',
-			PeerAddr => '127.0.0.1:8080'
+			PeerAddr => '127.0.0.1:' . port(8080)
 		)
 			or die "Can't connect to nginx: $!\n";
 

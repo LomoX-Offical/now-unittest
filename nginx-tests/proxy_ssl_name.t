@@ -95,14 +95,14 @@ http {
         }
 
         #location /ip6 {
-        #    proxy_pass https://[::1]:8081/;
+        #    proxy_pass https://[::1]:%%PORT_8081%%/;
         #    proxy_ssl_server_name on;
         #}
     }
 
     server {
         listen 127.0.0.1:8081 ssl;
-        #listen [::1]:8081 ssl;
+        #listen [::1]:%%PORT_8081%% ssl;
         server_name 1.example.com;
 
         ssl_certificate localhost.crt;

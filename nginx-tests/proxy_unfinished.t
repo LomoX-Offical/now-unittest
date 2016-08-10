@@ -90,7 +90,7 @@ EOF
 $t->write_file('big.html', 'X' x (1024 * 1024) . 'finished');
 
 $t->run_daemon(\&http_daemon);
-$t->run()->waitforsocket('127.0.0.1:8081');
+$t->run()->waitforsocket('127.0.0.1:' . port(8081));
 
 ###############################################################################
 
@@ -143,6 +143,8 @@ chmod(0000, $t->testdir() . '/proxy_temp');
 like(http_get_11('/proxy/big.html', sleep => 0.5),
 	qr/X(?!.*\x0d\x0a?0\x0d\x0a?)|finished/s, 'no proxy temp');
 
+chmod(0700, $t->testdir() . '/proxy_temp');
+
 ###############################################################################
 
 sub http_get_11 {
@@ -161,7 +163,7 @@ sub http_get_11 {
 sub http_daemon {
 	my $server = IO::Socket::INET->new(
 		Proto => 'tcp',
-		LocalAddr => '127.0.0.1:8081',
+		LocalAddr => '127.0.0.1:' . port(8081),
 		Listen => 5,
 		Reuse => 1
 	)

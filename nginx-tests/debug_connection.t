@@ -41,11 +41,11 @@ http {
 
     server {
         listen       127.0.0.1:8080;
-        listen       [::1]:8080;
+        listen       [::1]:%%PORT_8080%%;
         server_name  localhost;
 
         location /debug {
-            proxy_pass http://[::1]:8080/;
+            proxy_pass http://[::1]:%%PORT_8080%%/;
         }
     }
 }

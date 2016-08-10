@@ -25,11 +25,9 @@ select STDOUT; $| = 1;
 
 eval { require IO::Socket::SSL; };
 plan(skip_all => 'IO::Socket::SSL not installed') if $@;
-eval { IO::Socket::SSL::SSL_VERIFY_NONE(); };
-plan(skip_all => 'IO::Socket::SSL too old') if $@;
 
-my $t = Test::Nginx->new()->has(qw/http http_ssl http_v2 rewrite/)->plan(8);
-	#->has_daemon('openssl')->plan(8);
+my $t = Test::Nginx->new()->has(qw/http http_ssl http_v2/)
+	->has_daemon('openssl')->plan(1);
 
 $t->write_file_expand('nginx.conf', <<'EOF');
 
@@ -44,24 +42,13 @@ http {
     %%TEST_GLOBALS_HTTP%%
 
     server {
-        listen       127.0.0.1:8081 http2 ssl;
+        listen       127.0.0.1:8080 http2 ssl;
         server_name  localhost;
 
         ssl_certificate_key localhost.key;
         ssl_certificate localhost.crt;
 
-        location /h2 {
-            return 200 $http2;
-        }
-        location /sp {
-            return 200 $server_protocol;
-        }
-        location /scheme {
-            return 200 $scheme;
-        }
-        location /https {
-            return 200 $https;
-        }
+        location / { }
     }
 }
 
@@ -85,132 +72,60 @@ foreach my $name ('localhost') {
 		or die "Can't create certificate for $name: $!\n";
 }
 
+$t->write_file('tbig.html',
+	join('', map { sprintf "XX%06dXX", $_ } (1 .. 500000)));
+
 open OLDERR, ">&", \*STDERR; close STDERR;
 $t->run();
 open STDERR, ">&", \*OLDERR;
 
 ###############################################################################
 
-my ($sess, $sid, $frames, $frame);
-
-# SSL/TLS connection, NPN
+# client cancels 2nd stream after HEADERS has been created
+# while some unsent data was left in the SSL buffer
+# HEADERS frame may stuck in SSL buffer and won't be sent producing alert
 
 SKIP: {
-eval { IO::Socket::SSL->can_npn() or die; };
-skip 'OpenSSL NPN support required', 1 if $@;
+my $s = getconn(port(0));
+skip 'OpenSSL ALPN/NPN support required', 1 unless defined $s;
 
-$sess = new_session(8081, SSL => 1, npn => 'h2');
-$sid = new_stream($sess, { path => '/h2' });
-$frames = h2_read($sess, all => [{ sid => $sid, fin => 1 }]);
+ok($s, 'ssl connection');
 
-($frame) = grep { $_->{type} eq "DATA" } @$frames;
-is($frame->{data}, 'h2', 'http variable - npn');
+$t->todo_alerts() unless $t->has_version('1.11.3');
+
+my $sid = $s->new_stream({ path => '/tbig.html' });
+
+select undef, undef, undef, 0.2;
+$s->h2_rst($sid, 8);
+
+$sid = $s->new_stream({ path => '/tbig.html' });
+
+select undef, undef, undef, 0.2;
+$s->h2_rst($sid, 8);
+
+$t->stop();
 
 }
 
-# SSL/TLS connection, ALPN
+###############################################################################
 
-SKIP: {
-eval { IO::Socket::SSL->can_alpn() or die; };
-skip 'OpenSSL ALPN support required', 1 if $@;
+sub getconn {
+	my ($port) = @_;
+	my $s;
 
-$sess = new_session(8081, SSL => 1, alpn => 'h2');
-$sid = new_stream($sess, { path => '/h2' });
-$frames = h2_read($sess, all => [{ sid => $sid, fin => 1 }]);
+	eval {
+		IO::Socket::SSL->can_alpn() or die;
+		$s = Test::Nginx::HTTP2->new($port, SSL => 1, alpn => 'h2');
+	};
 
-($frame) = grep { $_->{type} eq "DATA" } @$frames;
-is($frame->{data}, 'h2', 'http variable - alpn');
+	return $s if defined $s;
 
-}
+	eval {
+		IO::Socket::SSL->can_npn() or die;
+		$s = Test::Nginx::HTTP2->new($port, SSL => 1, npn => 'h2');
+	};
 
-# $server_protocol - SSL/TLS connection, NPN
-
-SKIP: {
-eval { IO::Socket::SSL->can_npn() or die; };
-skip 'OpenSSL NPN support required', 1 if $@;
-
-$sess = new_session(8081, SSL => 1, npn => 'h2');
-$sid = new_stream($sess, { path => '/sp' });
-$frames = h2_read($sess, all => [{ sid => $sid, fin => 1 }]);
-
-($frame) = grep { $_->{type} eq "DATA" } @$frames;
-is($frame->{data}, 'HTTP/2.0', 'server_protocol variable - npn');
-
-}
-
-# $server_protocol - SSL/TLS connection, ALPN
-
-SKIP: {
-eval { IO::Socket::SSL->can_alpn() or die; };
-skip 'OpenSSL ALPN support required', 1 if $@;
-
-$sess = new_session(8081, SSL => 1, alpn => 'h2');
-$sid = new_stream($sess, { path => '/sp' });
-$frames = h2_read($sess, all => [{ sid => $sid, fin => 1 }]);
-
-($frame) = grep { $_->{type} eq "DATA" } @$frames;
-is($frame->{data}, 'HTTP/2.0', 'server_protocol variable - alpn');
-
-}
-
-# $scheme - SSL/TLS connection, NPN
-
-SKIP: {
-eval { IO::Socket::SSL->can_npn() or die; };
-skip 'OpenSSL NPN support required', 1 if $@;
-
-$sess = new_session(8081, SSL => 1, npn => 'h2');
-$sid = new_stream($sess, { path => '/scheme' });
-$frames = h2_read($sess, all => [{ sid => $sid, fin => 1 }]);
-
-($frame) = grep { $_->{type} eq "DATA" } @$frames;
-is($frame->{data}, 'https', 'scheme variable - npn');
-
-}
-
-# $scheme - SSL/TLS connection, ALPN
-
-SKIP: {
-eval { IO::Socket::SSL->can_alpn() or die; };
-skip 'OpenSSL ALPN support required', 1 if $@;
-
-$sess = new_session(8081, SSL => 1, alpn => 'h2');
-$sid = new_stream($sess, { path => '/scheme' });
-$frames = h2_read($sess, all => [{ sid => $sid, fin => 1 }]);
-
-($frame) = grep { $_->{type} eq "DATA" } @$frames;
-is($frame->{data}, 'https', 'scheme variable - alpn');
-
-}
-
-# $https - SSL/TLS connection, NPN
-
-SKIP: {
-eval { IO::Socket::SSL->can_npn() or die; };
-skip 'OpenSSL NPN support required', 1 if $@;
-
-$sess = new_session(8081, SSL => 1, npn => 'h2');
-$sid = new_stream($sess, { path => '/https' });
-$frames = h2_read($sess, all => [{ sid => $sid, fin => 1 }]);
-
-($frame) = grep { $_->{type} eq "DATA" } @$frames;
-is($frame->{data}, 'on', 'https variable - npn');
-
-}
-
-# $https - SSL/TLS connection, ALPN
-
-SKIP: {
-eval { IO::Socket::SSL->can_alpn() or die; };
-skip 'OpenSSL ALPN support required', 1 if $@;
-
-$sess = new_session(8081, SSL => 1, alpn => 'h2');
-$sid = new_stream($sess, { path => '/https' });
-$frames = h2_read($sess, all => [{ sid => $sid, fin => 1 }]);
-
-($frame) = grep { $_->{type} eq "DATA" } @$frames;
-is($frame->{data}, 'on', 'https variable - alpn');
-
+	return $s;
 }
 
 ###############################################################################

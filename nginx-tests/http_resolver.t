@@ -43,9 +43,9 @@ http {
         server_name  localhost;
 
         location / {
-            resolver    127.0.0.1:8081;
+            resolver    127.0.0.1:%%PORT_8081_UDP%%;
             resolver_timeout 1s;
-            proxy_pass  http://$host:8080/backend;
+            proxy_pass  http://$host:%%PORT_8080%%/backend;
 
             proxy_next_upstream http_504 timeout error;
             proxy_intercept_errors on;
@@ -53,46 +53,46 @@ http {
             error_page 504 502 /50x;
         }
         location /two {
-            resolver    127.0.0.1:8081 127.0.0.1:8082;
-            proxy_pass  http://$host:8080/backend;
+            resolver    127.0.0.1:%%PORT_8081_UDP%% 127.0.0.1:%%PORT_8082_UDP%%;
+            proxy_pass  http://$host:%%PORT_8080%%/backend;
         }
         location /valid {
-            resolver    127.0.0.1:8081 valid=5s;
-            proxy_pass  http://$host:8080/backend;
+            resolver    127.0.0.1:%%PORT_8081_UDP%% valid=5s;
+            proxy_pass  http://$host:%%PORT_8080%%/backend;
         }
         location /case {
-            resolver    127.0.0.1:8081;
-            proxy_pass  http://$http_x_name:8080/backend;
+            resolver    127.0.0.1:%%PORT_8081_UDP%%;
+            proxy_pass  http://$http_x_name:%%PORT_8080%%/backend;
         }
         location /invalid {
-            proxy_pass  http://$host:8080/backend;
+            proxy_pass  http://$host:%%PORT_8080%%/backend;
         }
         location /long {
-            resolver    127.0.0.1:8081;
+            resolver    127.0.0.1:%%PORT_8081_UDP%%;
             resolver_timeout 4s;
-            proxy_pass  http://$host:8080/backend;
+            proxy_pass  http://$host:%%PORT_8080%%/backend;
         }
         location /resend {
-            resolver    127.0.0.1:8081;
+            resolver    127.0.0.1:%%PORT_8081_UDP%%;
             resolver_timeout 8s;
-            proxy_pass  http://$host:8080/backend;
+            proxy_pass  http://$host:%%PORT_8080%%/backend;
         }
         location /bad {
-            resolver    127.0.0.1:8089;
+            resolver    127.0.0.1:%%PORT_8084_UDP%%;
             resolver_timeout 1s;
-            proxy_pass  http://$host:8080/backend;
+            proxy_pass  http://$host:%%PORT_8080%%/backend;
         }
         location /tcp {
-            resolver    127.0.0.1:8083 127.0.0.1:8082;
+            resolver    127.0.0.1:%%PORT_8083_UDP%% 127.0.0.1:%%PORT_8082_UDP%%;
             resolver_timeout 1s;
-            proxy_pass  http://$host:8080/backend;
+            proxy_pass  http://$host:%%PORT_8080%%/backend;
             proxy_connect_timeout 1s;
             add_header X-IP $upstream_addr;
             error_page 504 502 /50x;
 
             location /tcp2 {
                 resolver_timeout 8s;
-                proxy_pass  http://$host:8080/backend;
+                proxy_pass  http://$host:%%PORT_8080%%/backend;
             }
         }
 
@@ -107,19 +107,24 @@ http {
 
 EOF
 
-$t->run_daemon(\&dns_daemon, 8081, $t);
-$t->run_daemon(\&dns_daemon, 8082, $t);
-$t->run_daemon(\&dns_daemon, 8083, $t, tcp => 1);
-$t->run_daemon(\&dns_daemon, 8089, $t);
+$t->run_daemon(\&dns_daemon, port(8081), $t);
+$t->run_daemon(\&dns_daemon, port(8082), $t);
+
+$t->run_daemon(\&dns_daemon, port(8083), $t, tcp => 1);
+$t->waitforfile($t->testdir . '/' . port(8083));
+port(8083, socket => 1)->close();
+
+$t->run_daemon(\&dns_daemon, port(8084), $t);
 
 $t->run()->plan(38);
 
-$t->waitforfile($t->testdir . '/8081');
-$t->waitforfile($t->testdir . '/8082');
-$t->waitforfile($t->testdir . '/8083');
-$t->waitforfile($t->testdir . '/8089');
+$t->waitforfile($t->testdir . '/' . port(8081));
+$t->waitforfile($t->testdir . '/' . port(8082));
+$t->waitforfile($t->testdir . '/' . port(8084));
 
 ###############################################################################
+
+my $p0 = port(8080);
 
 # schedule resend test, which takes about 5 seconds to complete
 
@@ -163,11 +168,11 @@ like(http_host_header('alias.example.com', '/'), qr/200 OK/, 'DNAME');
 # nonexisting IPs enumerated with proxy_next_upstream
 
 like(http_host_header('many.example.net', '/'),
-	qr/^127.0.0.20(1:8080, 127.0.0.202:8080|2:8080, 127.0.0.201:8080)$/m,
+	qr/^127.0.0.20(1:$p0, 127.0.0.202:$p0|2:$p0, 127.0.0.201:$p0)$/m,
 	'A many');
 
 like(http_host_header('many.example.net', '/'),
-	qr/^127.0.0.20(1:8080, 127.0.0.202:8080|2:8080, 127.0.0.201:8080)$/m,
+	qr/^127.0.0.20(1:$p0, 127.0.0.202:$p0|2:$p0, 127.0.0.201:$p0)$/m,
 	'A many cached');
 
 # tests for several resolvers specified in directive
@@ -323,7 +328,7 @@ sub reply_handler {
 	use constant CNAME	=> 5;
 	use constant DNAME	=> 39;
 
-	use constant IN 	=> 1;
+	use constant IN		=> 1;
 
 	# default values
 
@@ -412,7 +417,7 @@ sub reply_handler {
 	} elsif ($name eq 'cname.example.net') {
 		$state->{cnamecnt}++;
 		if ($state->{cnamecnt} > 2) {
-		        $rcode = SERVFAIL;
+			$rcode = SERVFAIL;
 		}
 		push @rdata, pack("n3N nCa5n", 0xc00c, CNAME, IN, $ttl,
 			8, 5, 'alias', 0xc012);
@@ -436,7 +441,7 @@ sub reply_handler {
 		push @rdata, pack("n3N nCa18n", 0xc00c, CNAME, IN, 1,
 			21, 18, 'cname_a_ttl2_alias', 0xc019);
 		if (++$state->{cttl2cnt} >= 2) {
-		        $rcode = SERVFAIL;
+			$rcode = SERVFAIL;
 		}
 		push @rdata, pack('n3N nC4', 0xc036, A, IN, $ttl,
 			4, split(/\./, '127.0.0.1'));
@@ -483,7 +488,7 @@ sub reply_handler {
 		push @rdata, rd_addr(0, '127.0.0.1');
 
 	} elsif ($name eq '2.example.net') {
-		if ($port == 8081) {
+		if ($port == port(8081)) {
 			$state->{twocnt}++;
 		}
 		if ($state->{twocnt} & 1) {
@@ -495,7 +500,7 @@ sub reply_handler {
 		}
 
 	} elsif ($name =~ /tcp2?.example.net/) {
-		$rcode = FORMERR if $port == 8082;
+		$rcode = FORMERR if $port == port(8082);
 		$hdr |= 0x0300 unless $extra{tcp};
 		push @rdata, rd_addr($ttl, $extra{tcp}
 			? '127.0.0.1' : '127.0.0.201') if $type == A;
@@ -521,9 +526,9 @@ sub dns_daemon {
 
 	my ($data, $recv_data);
 	my $socket = IO::Socket::INET->new(
-		LocalAddr    => '127.0.0.1',
-		LocalPort    => $port,
-		Proto        => 'udp',
+		LocalAddr => '127.0.0.1',
+		LocalPort => $port,
+		Proto => 'udp',
 	)
 		or die "Can't create listening socket: $!\n";
 
@@ -531,14 +536,7 @@ sub dns_daemon {
 	my $tcp = 0;
 
 	if ($extra{tcp}) {
-		$tcp = IO::Socket::INET->new(
-			Proto => 'tcp',
-			LocalHost => "127.0.0.1:$port",
-			Listen => 5,
-			Reuse => 1
-		)
-			or die "Can't create listening socket: $!\n";
-
+		$tcp = port(8083, socket => 1);
 		$sel->add($tcp);
 	}
 
@@ -547,16 +545,16 @@ sub dns_daemon {
 	# track number of relevant queries
 
 	my %state = (
-		cnamecnt     => 0,
-		twocnt       => 0,
-		ttlcnt       => 0,
-		ttl0cnt      => 0,
-		cttlcnt      => 0,
-		cttl2cnt     => 0,
-		manycnt      => 0,
-		casecnt      => 0,
-		idcnt        => 0,
-		fecnt        => 0,
+		cnamecnt	=> 0,
+		twocnt		=> 0,
+		ttlcnt		=> 0,
+		ttl0cnt		=> 0,
+		cttlcnt		=> 0,
+		cttl2cnt	=> 0,
+		manycnt		=> 0,
+		casecnt		=> 0,
+		idcnt		=> 0,
+		fecnt		=> 0,
 	);
 
 	# signal we are ready

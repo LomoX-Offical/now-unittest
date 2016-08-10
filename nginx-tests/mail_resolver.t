@@ -25,10 +25,8 @@ select STDOUT; $| = 1;
 
 local $SIG{PIPE} = 'IGNORE';
 
-my $t = Test::Nginx->new()->has(qw/mail smtp http rewrite/)
-	->run_daemon(\&Test::Nginx::SMTP::smtp_test_daemon);
-
-$t->write_file_expand('nginx.conf', <<'EOF');
+my $t = Test::Nginx->new()->has(qw/mail smtp http rewrite/)->plan(8)
+	->write_file_expand('nginx.conf', <<'EOF');
 
 %%TEST_GLOBALS%%
 
@@ -48,44 +46,46 @@ mail {
     server {
         listen    127.0.0.1:8025;
         protocol  smtp;
-        resolver  127.0.0.1:8081 127.0.0.1:8082 127.0.0.1:8083;
+        resolver  127.0.0.1:%%PORT_8081_UDP%%
+                  127.0.0.1:%%PORT_8082_UDP%%
+                  127.0.0.1:%%PORT_8083_UDP%%;
     }
 
     server {
         listen    127.0.0.1:8027;
         protocol  smtp;
-        resolver  127.0.0.1:8082;
+        resolver  127.0.0.1:%%PORT_8082_UDP%%;
     }
 
     server {
         listen    127.0.0.1:8028;
         protocol  smtp;
-        resolver  127.0.0.1:8083;
+        resolver  127.0.0.1:%%PORT_8083_UDP%%;
 
     }
 
     server {
         listen    127.0.0.1:8029;
         protocol  smtp;
-        resolver  127.0.0.1:8084;
+        resolver  127.0.0.1:%%PORT_8084_UDP%%;
     }
 
     server {
         listen    127.0.0.1:8030;
         protocol  smtp;
-        resolver  127.0.0.1:8085;
+        resolver  127.0.0.1:%%PORT_8085_UDP%%;
     }
 
     server {
         listen    127.0.0.1:8031;
         protocol  smtp;
-        resolver  127.0.0.1:8086;
+        resolver  127.0.0.1:%%PORT_8086_UDP%%;
     }
 
     server {
         listen    127.0.0.1:8032;
         protocol  smtp;
-        resolver  127.0.0.1:8087;
+        resolver  127.0.0.1:%%PORT_8087_UDP%%;
     }
 
 }
@@ -106,7 +106,7 @@ http {
 
             add_header Auth-Status $reply;
             add_header Auth-Server 127.0.0.1;
-            add_header Auth-Port 8026;
+            add_header Auth-Port %%PORT_8026%%;
             return 204;
         }
     }
@@ -114,16 +114,13 @@ http {
 
 EOF
 
-for (8081 .. 8087) {
-	$t->run_daemon(\&dns_daemon, $_, $t);
-}
+$t->run_daemon(\&Test::Nginx::SMTP::smtp_test_daemon);
+$t->run_daemon(\&dns_daemon, port($_), $t) foreach (8081 .. 8087);
+
 $t->run();
 
-for (8081 .. 8087) {
-	$t->waitforfile($t->testdir . "/$_");
-}
-
-$t->plan(8);
+$t->waitforsocket('127.0.0.1:' . port(8026));
+$t->waitforfile($t->testdir . '/' . port($_)) foreach (8081 .. 8087);
 
 ###############################################################################
 
@@ -159,7 +156,7 @@ $s->read();
 
 # SERVFAIL
 
-$s = Test::Nginx::SMTP->new(PeerAddr => "127.0.0.1:8027");
+$s = Test::Nginx::SMTP->new(PeerAddr => '127.0.0.1:' . port(8027));
 $s->read();
 $s->send('EHLO example.com');
 $s->read();
@@ -174,7 +171,7 @@ $s->read();
 
 # PTR with zero length RDATA
 
-$s = Test::Nginx::SMTP->new(PeerAddr => "127.0.0.1:8028");
+$s = Test::Nginx::SMTP->new(PeerAddr => '127.0.0.1:' . port(8028));
 $s->read();
 $s->send('EHLO example.com');
 $s->read();
@@ -192,7 +189,7 @@ $s->read();
 TODO: {
 local $TODO = 'support for CNAME RR';
 
-$s = Test::Nginx::SMTP->new(PeerAddr => "127.0.0.1:8029");
+$s = Test::Nginx::SMTP->new(PeerAddr => '127.0.0.1:' . port(8029));
 $s->read();
 $s->send('EHLO example.com');
 $s->read();
@@ -213,7 +210,7 @@ TODO: {
 local $TODO = 'support for uncompressed name in PTR'
 	unless $t->has_version('1.9.11');
 
-$s = Test::Nginx::SMTP->new(PeerAddr => "127.0.0.1:8030");
+$s = Test::Nginx::SMTP->new(PeerAddr => '127.0.0.1:' . port(8030));
 $s->read();
 $s->send('EHLO example.com');
 $s->read();
@@ -231,7 +228,7 @@ $s->read();
 TODO: {
 local $TODO = 'PTR type checking' unless $t->has_version('1.9.11');
 
-$s = Test::Nginx::SMTP->new(PeerAddr => "127.0.0.1:8031");
+$s = Test::Nginx::SMTP->new(PeerAddr => '127.0.0.1:' . port(8031));
 $s->read();
 $s->send('EHLO example.com');
 $s->read();
@@ -251,7 +248,7 @@ $s->read();
 TODO: {
 local $TODO = 'not yet' unless $t->has_version('1.9.11');
 
-$s = Test::Nginx::SMTP->new(PeerAddr => "127.0.0.1:8032");
+$s = Test::Nginx::SMTP->new(PeerAddr => '127.0.0.1:' . port(8032));
 $s->read();
 $s->send('EHLO example.com');
 $s->read();
@@ -280,9 +277,9 @@ sub reply_handler {
 	use constant A		=> 1;
 	use constant CNAME	=> 5;
 	use constant PTR	=> 12;
-	use constant DNAME      => 39;
+	use constant DNAME	=> 39;
 
-	use constant IN 	=> 1;
+	use constant IN		=> 1;
 
 	# default values
 
@@ -307,34 +304,34 @@ sub reply_handler {
 		push @rdata, rd_addr($ttl, '127.0.0.1');
 
 	} elsif ($name eq '1.0.0.127.in-addr.arpa' && $type == PTR) {
-		if ($port == 8081) {
+		if ($port == port(8081)) {
 			push @rdata, rd_name(PTR, $ttl, 'a.example.net');
 
-		} elsif ($port == 8082) {
+		} elsif ($port == port(8082)) {
 			$rcode = SERVFAIL;
 
-		} elsif ($port == 8083) {
+		} elsif ($port == port(8083)) {
 			# zero length RDATA
 
 			push @rdata, pack("n3N n", 0xc00c, PTR, IN, $ttl, 0);
 
-		} elsif ($port == 8084) {
+		} elsif ($port == port(8084)) {
 			# PTR answered with CNAME
 
 			push @rdata, rd_name(CNAME, $ttl,
 				'1.1.0.0.127.in-addr.arpa');
 
-		} elsif ($port == 8085) {
+		} elsif ($port == port(8085)) {
 			# uncompressed answer
 
 			push @rdata, pack("(C/a*)6x n2N n(C/a*)3x",
 				('1', '0', '0', '127', 'in-addr', 'arpa'),
 				PTR, IN, $ttl, 15, ('a', 'example', 'net'));
 
-		} elsif ($port == 8086) {
+		} elsif ($port == port(8086)) {
 			push @rdata, rd_name(DNAME, $ttl, 'a.example.net');
 
-		} elsif ($port == 8087) {
+		} elsif ($port == port(8087)) {
 			# PTR answered with CNAME+PTR
 
 			push @rdata, rd_name(CNAME, $ttl,
@@ -378,9 +375,9 @@ sub dns_daemon {
 
 	my ($data, $recv_data);
 	my $socket = IO::Socket::INET->new(
-		LocalAddr    => '127.0.0.1',
-		LocalPort    => $port,
-		Proto        => 'udp',
+		LocalAddr => '127.0.0.1',
+		LocalPort => $port,
+		Proto => 'udp',
 	)
 		or die "Can't create listening socket: $!\n";
 
