@@ -26,7 +26,7 @@ select STDOUT; $| = 1;
 
 eval { require FCGI; };
 plan(skip_all => 'FCGI not installed') if $@;
-plan(skip_all => 'win32') if $^O eq 'MSWin32';
+#plan(skip_all => 'win32') if $^O eq 'MSWin32';
 
 my $t = Test::Nginx->new()->has(qw/http fastcgi/)->plan(2)
 	->write_file_expand('nginx.conf', <<'EOF');
@@ -108,7 +108,7 @@ EOF
 
 sub fastcgi_daemon {
 	my ($port) = @_;
-	my $socket = FCGI::OpenSocket("127.0.0.1:$port", 5);
+	my $socket = FCGI::OpenSocket("localhost:$port", 5);
 	my $request = FCGI::Request(\*STDIN, \*STDOUT, \*STDERR, \%ENV,
 		$socket);
 

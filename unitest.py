@@ -20,6 +20,8 @@ def walk_dir(dir, py_path, topdown = True):
 
     for root, dirs, files in os.walk(dir, topdown):
         for name in files:
+            #if name != 'access.t' : 
+            #    continue;
             if name.endswith('.t') == False:
                 continue;
 

@@ -25,7 +25,7 @@ use Test::Nginx;
 select STDERR; $| = 1;
 select STDOUT; $| = 1;
 
-plan(skip_all => 'win32') if $^O eq 'MSWin32';
+#plan(skip_all => 'win32') if $^O eq 'MSWin32';
 
 my $t = Test::Nginx->new()->has(qw/http rewrite/)->plan(20)
 	->write_file_expand('nginx.conf', <<'EOF');
@@ -88,15 +88,15 @@ http {
         }
     }
 
-    server {
-        listen       127.0.0.1:8080;
-        server_name  "~^(?P<name>www\p{N}+)\.example\.com$";
+    #server {
+    #    listen       127.0.0.1:8080;
+    #    server_name  "~^(?P<name>www\p{N}+)\.example\.com$";
 
-        location / {
-            add_header X-Server $server_name;
-            add_header X-Match  $name;
-        }
-    }
+    #    location / {
+    #        add_header X-Server $server_name;
+    #        add_header X-Match  $name;
+    #    }
+    #}
 
     server {
         listen       127.0.0.1:8080;
