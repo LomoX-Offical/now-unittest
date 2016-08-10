@@ -58,7 +58,7 @@ http {
 EOF
 
 $t->run_daemon(\&fastcgi_daemon);
-$t->run()->waitforsocket('127.0.0.1:8081');
+$t->run()->waitforsocket('127.0.0.1:' . port(8081));
 
 ###############################################################################
 
@@ -79,7 +79,7 @@ like(http_get('/stderr'), qr/SEE-THIS.*^2$/ms, 'large stderr cached');
 ###############################################################################
 
 sub fastcgi_daemon {
-	my $socket = FCGI::OpenSocket('127.0.0.1:8081', 5);
+	my $socket = FCGI::OpenSocket('127.0.0.1:' . port(8081), 5);
 	my $request = FCGI::Request(\*STDIN, \*STDOUT, \*STDERR, \%ENV,
 		$socket);
 
@@ -92,7 +92,7 @@ sub fastcgi_daemon {
 		}
 
 		print <<EOF;
-Location: http://127.0.0.1:8080/redirect
+Location: http://localhost/redirect
 Content-Type: text/html
 
 SEE-THIS

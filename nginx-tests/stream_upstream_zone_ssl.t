@@ -39,14 +39,14 @@ stream {
     proxy_ssl_session_reuse on;
 
     upstream u {
-        zone u 32k;
-        server 127.0.0.1:8087;
+        zone u 1m;
+        server 127.0.0.1:8084;
     }
 
     upstream u2 {
-        zone u2 32k;
-        server 127.0.0.1:8087 backup;
-        server 127.0.0.1:8088 down;
+        zone u2 1m;
+        server 127.0.0.1:8084 backup;
+        server 127.0.0.1:8085 down;
     }
 
     server {
@@ -76,7 +76,7 @@ http {
     %%TEST_GLOBALS_HTTP%%
 
     server {
-        listen 127.0.0.1:8087 ssl;
+        listen 127.0.0.1:8084 ssl;
 
         ssl_certificate_key localhost.key;
         ssl_certificate localhost.crt;
@@ -114,24 +114,22 @@ $t->run();
 
 ###############################################################################
 
-like(http_get('/', socket => getconn('127.0.0.1:8080')),
-	qr/200 OK.*X-Session: \./s, 'ssl');
-like(http_get('/', socket => getconn('127.0.0.1:8081')),
+like(http_get('/'), qr/200 OK.*X-Session: \./s, 'ssl');
+like(http_get('/', socket => getconn('127.0.0.1:' . port(8081))),
 	qr/200 OK.*X-Session: \./s, 'ssl 2');
 
-like(http_get('/', socket => getconn('127.0.0.1:8080')),
-	qr/200 OK.*X-Session: \./s, 'ssl reuse session');
-like(http_get('/', socket => getconn('127.0.0.1:8081')),
+like(http_get('/'), qr/200 OK.*X-Session: \./s, 'ssl reuse session');
+like(http_get('/', socket => getconn('127.0.0.1:' . port(8081))),
 	qr/200 OK.*X-Session: r/s, 'ssl reuse session 2');
 
-like(http_get('/', socket => getconn('127.0.0.1:8082')),
+like(http_get('/', socket => getconn('127.0.0.1:' . port(8082))),
 	qr/200 OK.*X-Session: \./s, 'ssl backup');
-like(http_get('/', socket => getconn('127.0.0.1:8083')),
+like(http_get('/', socket => getconn('127.0.0.1:' . port(8083))),
 	qr/200 OK.*X-Session: \./s, 'ssl backup 2');
 
-like(http_get('/', socket => getconn('127.0.0.1:8082')),
+like(http_get('/', socket => getconn('127.0.0.1:' . port(8082))),
 	qr/200 OK.*X-Session: \./s, 'ssl reuse session backup');
-like(http_get('/', socket => getconn('127.0.0.1:8083')),
+like(http_get('/', socket => getconn('127.0.0.1:' . port(8083))),
 	qr/200 OK.*X-Session: r/s, 'ssl reuse session backup 2');
 
 ###############################################################################
@@ -140,7 +138,7 @@ sub getconn {
 	my $peer = shift;
 	my $s = IO::Socket::INET->new(
 		Proto => 'tcp',
-		PeerAddr => $peer || '127.0.0.1:8080'
+		PeerAddr => $peer
 	)
 		or die "Can't connect to nginx: $!\n";
 

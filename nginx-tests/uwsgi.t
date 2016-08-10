@@ -73,13 +73,13 @@ if ($uwsgihelp !~ /--wsgi-file/) {
 	push @uwsgiopts, '--plugin', 'python';
 }
 
-$t->run_daemon('uwsgi', '--socket', '127.0.0.1:8081', @uwsgiopts,
+$t->run_daemon('uwsgi', '--socket', '127.0.0.1:' . port(8081), @uwsgiopts,
 	'--wsgi-file', $t->testdir() . '/uwsgi_test_app.py',
 	'--logto', $t->testdir() . '/uwsgi_log');
 
 $t->run();
 
-$t->waitforsocket('127.0.0.1:8081')
+$t->waitforsocket('127.0.0.1:' . port(8081))
 	or die "Can't start uwsgi";
 
 ###############################################################################
@@ -90,7 +90,8 @@ unlike(http_head('/head'), qr/SEE-THIS/, 'no data in HEAD');
 like(http_get_headers('/headers'), qr/SEE-THIS/,
 	'uwsgi request with many ignored headers');
 
-like(http_get('/var?b=127.0.0.1:8081'), qr/SEE-THIS/, 'uwsgi with variables');
+like(http_get('/var?b=127.0.0.1:' . port(8081)), qr/SEE-THIS/,
+	'uwsgi with variables');
 like(http_get('/var?b=u'), qr/SEE-THIS/, 'uwsgi with variables to upstream');
 
 ###############################################################################

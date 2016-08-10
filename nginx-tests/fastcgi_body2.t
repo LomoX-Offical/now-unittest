@@ -71,12 +71,12 @@ http {
 
 EOF
 
-$t->run_daemon(\&fastcgi_daemon, 8081);
-$t->run_daemon(\&fastcgi_daemon, 8082);
+$t->run_daemon(\&fastcgi_daemon, port(8081));
+$t->run_daemon(\&fastcgi_daemon, port(8082));
 $t->run();
 
-$t->waitforsocket('127.0.0.1:8081');
-$t->waitforsocket('127.0.0.1:8082');
+$t->waitforsocket('127.0.0.1:' . port(8081));
+$t->waitforsocket('127.0.0.1:' . port(8082));
 
 ###############################################################################
 
@@ -116,10 +116,10 @@ sub fastcgi_daemon {
 		read(STDIN, my $body, $ENV{'CONTENT_LENGTH'});
 		my $len = length $body;
 
-		sleep 3 if $port == 8081;
+		sleep 3 if $port == port(8081);
 
 		print <<EOF;
-Location: http://127.0.0.1:8080/redirect
+Location: http://localhost/redirect
 Content-Type: text/html
 X-Length: $len
 

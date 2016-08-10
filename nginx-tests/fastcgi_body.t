@@ -49,7 +49,7 @@ http {
 EOF
 
 $t->run_daemon(\&fastcgi_daemon);
-$t->run()->waitforsocket('127.0.0.1:8081');
+$t->run()->waitforsocket('127.0.0.1:' . port(8081));
 
 ###############################################################################
 
@@ -141,7 +141,7 @@ sub fastcgi_respond($$$$) {
 sub fastcgi_daemon {
 	my $server = IO::Socket::INET->new(
 		Proto => 'tcp',
-		LocalAddr => '127.0.0.1:8081',
+		LocalAddr => '127.0.0.1:' . port(8081),
 		Listen => 5,
 		Reuse => 1
 	)
@@ -176,7 +176,7 @@ sub fastcgi_daemon {
 
 		# respond
 		fastcgi_respond($client, $version, $id, <<EOF);
-Location: http://127.0.0.1:8080/redirect
+Location: http://localhost/redirect
 Content-Type: text/html
 X-Body: $body
 

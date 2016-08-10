@@ -75,18 +75,19 @@ http {
 EOF
 
 $t->write_file('stub', '');
-$t->run_daemon(\&http_daemon, 8081);
+$t->run_daemon(\&http_daemon, port(8081));
 $t->try_run('no upstream_connect_time')->plan(18);
 
-$t->waitforsocket('127.0.0.1:8081');
+$t->waitforsocket('127.0.0.1:' . port(8081));
 
 ###############################################################################
 
 my $re = qr/(\d\.\d{3})/;
+my $p0 = port(8080);
 my ($ct, $ht, $rt, $ct2, $ht2, $rt2);
 
-like(http_get('/vars'), qr/X-Proxy-Host:\s127\.0\.0\.1:8080/, 'proxy_host');
-like(http_get('/vars'), qr/X-Proxy-Port:\s8080/, 'proxy_port');
+like(http_get('/vars'), qr/X-Proxy-Host:\s127\.0\.0\.1:$p0/, 'proxy_host');
+like(http_get('/vars'), qr/X-Proxy-Port:\s$p0/, 'proxy_port');
 like(http_xff('/vars', '192.0.2.1'), qr/X-Proxy-Forwarded:.*192\.0\.2\.1/,
 	'proxy_add_x_forwarded_for');
 

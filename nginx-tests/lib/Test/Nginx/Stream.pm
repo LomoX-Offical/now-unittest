@@ -28,7 +28,6 @@ sub dgram {
 
 	return Test::Nginx::Stream->new(
 		Proto => "udp",
-		PeerAddr => '127.0.0.1:8080',
 		@_
 	);
 }
@@ -41,7 +40,8 @@ sub new {
 
 	$self->{_socket} = IO::Socket::INET->new(
 		Proto => "tcp",
-		PeerAddr => '127.0.0.1:8080',
+		PeerAddr => '127.0.0.1',
+		PeerPort => port(8080),
 		@_
 	)
 		or die "Can't connect to nginx: $!\n";
@@ -58,13 +58,13 @@ sub new {
 }
 
 sub write {
-	my ($self, $message) = @_;
+	my ($self, $message, %extra) = @_;
 	my $s = $self->{_socket};
 
 	local $SIG{PIPE} = 'IGNORE';
 
 	$s->blocking(0);
-	while (IO::Select->new($s)->can_write(1.5)) {
+	while (IO::Select->new($s)->can_write($extra{write_timeout} || 1.5)) {
 		my $n = $s->syswrite($message);
 		log_out(substr($message, 0, $n));
 		last unless $n;
@@ -79,13 +79,13 @@ sub write {
 }
 
 sub read {
-	my ($self) = @_;
+	my ($self, %extra) = @_;
 	my ($s, $buf);
 
 	$s = $self->{_socket};
 
 	$s->blocking(0);
-	if (IO::Select->new($s)->can_read(5)) {
+	if (IO::Select->new($s)->can_read($extra{read_timeout} || 5)) {
 		$s->sysread($buf, 1024);
 	};
 
@@ -103,13 +103,13 @@ sub io {
 	$read = 1 if !defined $read
 		&& $self->{_socket}->socktype() == &SOCK_DGRAM;
 
-	$self->write($data);
+	$self->write($data, %extra);
 
 	$data = '';
 	while (1) {
 		last if defined $read && --$read < 0;
 
-		my $buf = $self->read();
+		my $buf = $self->read(%extra);
 		last unless defined $buf and length($buf);
 
 		$data .= $buf;

@@ -128,7 +128,7 @@ like(http_get_body('/small', '0123456789'),
 
 # interactive tests
 
-my $s = get_body('/preread', 8082);
+my $s = get_body('/preread', port(8082));
 ok($s, 'no preread');
 
 SKIP: {
@@ -144,7 +144,7 @@ like($s->{http_end}(), qr/200 OK/, 'no preread - response');
 
 }
 
-$s = get_body('/preread', 8082, '01234');
+$s = get_body('/preread', port(8082), '01234');
 ok($s, 'preread');
 
 SKIP: {
@@ -158,7 +158,7 @@ like($s->{http_end}(), qr/200 OK/, 'preread - response');
 
 }
 
-$s = get_body('/preread', 8082, '01234', many => 1);
+$s = get_body('/preread', port(8082), '01234', many => 1);
 ok($s, 'chunks');
 
 SKIP: {

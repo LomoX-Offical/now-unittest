@@ -33,11 +33,9 @@ plan(skip_all => 'IO::Socket::SSL too old') if $@;
 
 local $SIG{PIPE} = 'IGNORE';
 
-my $t = Test::Nginx->new()
-	->has(qw/mail mail_ssl imap http rewrite/)->has_daemon('openssl')
-	->run_daemon(\&Test::Nginx::IMAP::imap_test_daemon)->plan(12);
-
-$t->write_file_expand('nginx.conf', <<'EOF');
+my $t = Test::Nginx->new()->has(qw/mail mail_ssl imap http rewrite/)
+	->has_daemon('openssl')->plan(12)
+	->write_file_expand('nginx.conf', <<'EOF');
 
 %%TEST_GLOBALS%%
 
@@ -110,7 +108,7 @@ http {
 
             add_header Auth-Status OK;
             add_header Auth-Server 127.0.0.1;
-            add_header Auth-Port 8144;
+            add_header Auth-Port %%PORT_8144%%;
             add_header Auth-Wait 1;
             return 204;
         }
@@ -137,7 +135,8 @@ foreach my $name ('1.example.com', '2.example.com', '3.example.com') {
 		or die "Can't create certificate for $name: $!\n";
 }
 
-$t->run();
+$t->run_daemon(\&Test::Nginx::IMAP::imap_test_daemon);
+$t->run()->waitforsocket('127.0.0.1:' . port(8144));
 
 ###############################################################################
 
@@ -150,25 +149,25 @@ my %ssl = (
 
 # no ssl connection
 
-my $s = Test::Nginx::IMAP->new(PeerAddr => '127.0.0.1:8142');
+my $s = Test::Nginx::IMAP->new(PeerAddr => '127.0.0.1:' . port(8142));
 $s->ok('plain connection');
 $s->send('1 AUTHENTICATE PLAIN ' . $cred->("s1"));
 
 # no cert
 
-$s = Test::Nginx::IMAP->new(PeerAddr => '127.0.0.1:8143', %ssl);
+$s = Test::Nginx::IMAP->new(PeerAddr => '127.0.0.1:' . port(8143), %ssl);
 $s->check(qr/BYE No required SSL certificate/, 'no cert');
 
 # no cert with ssl_verify_client optional
 
-$s = Test::Nginx::IMAP->new(PeerAddr => '127.0.0.1:8145', %ssl);
+$s = Test::Nginx::IMAP->new(PeerAddr => '127.0.0.1:' . port(8145), %ssl);
 $s->ok('no optional cert');
 $s->send('1 AUTHENTICATE PLAIN ' . $cred->("s2"));
 
 # wrong cert with ssl_verify_client optional
 
 $s = Test::Nginx::IMAP->new(
-	PeerAddr => '127.0.0.1:8145',
+	PeerAddr => '127.0.0.1:' . port(8145),
 	SSL_cert_file => "$d/1.example.com.crt",
 	SSL_key_file => "$d/1.example.com.key",
 	%ssl,
@@ -178,7 +177,7 @@ $s->check(qr/BYE SSL certificate error/, 'bad optional cert');
 # wrong cert with ssl_verify_client optional_no_ca
 
 $s = Test::Nginx::IMAP->new(
-	PeerAddr => '127.0.0.1:8147',
+	PeerAddr => '127.0.0.1:' . port(8147),
 	SSL_cert_file => "$d/1.example.com.crt",
 	SSL_key_file => "$d/1.example.com.key",
 	%ssl,
@@ -189,7 +188,7 @@ $s->send('1 AUTHENTICATE PLAIN ' . $cred->("s3"));
 # matching cert with ssl_verify_client optional
 
 $s = Test::Nginx::IMAP->new(
-	PeerAddr => '127.0.0.1:8145',
+	PeerAddr => '127.0.0.1:' . port(8145),
 	SSL_cert_file => "$d/2.example.com.crt",
 	SSL_key_file => "$d/2.example.com.key",
 	%ssl,
@@ -200,7 +199,7 @@ $s->send('1 AUTHENTICATE PLAIN ' . $cred->("s4"));
 # trusted cert with ssl_verify_client optional
 
 $s = Test::Nginx::IMAP->new(
-	PeerAddr => '127.0.0.1:8146',
+	PeerAddr => '127.0.0.1:' . port(8146),
 	SSL_cert_file => "$d/3.example.com.crt",
 	SSL_key_file => "$d/3.example.com.key",
 	%ssl,

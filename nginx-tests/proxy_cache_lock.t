@@ -69,7 +69,7 @@ $t->run_daemon(\&http_fake_daemon);
 
 $t->run();
 
-$t->waitforsocket('127.0.0.1:8081');
+$t->waitforsocket('127.0.0.1:' . port(8081));
 
 ###############################################################################
 
@@ -126,7 +126,7 @@ like(http_get('/nolock'), qr/request 3/, 'nolock - last cached');
 sub http_fake_daemon {
 	my $server = IO::Socket::INET->new(
 		Proto => 'tcp',
-		LocalAddr => '127.0.0.1:8081',
+		LocalAddr => '127.0.0.1:' . port(8081),
 		Listen => 5,
 		Reuse => 1
 	)

@@ -30,7 +30,7 @@ $t->write_file_expand('nginx.conf', <<'EOF');
 
 %%TEST_GLOBALS%%
 
-error_log syslog:server=127.0.0.1:8083 info;
+error_log syslog:server=127.0.0.1:%%PORT_8081_UDP%% info;
 error_log %%TESTDIR%%/f_glob.log info;
 
 daemon off;
@@ -46,7 +46,7 @@ http {
     log_format empty "";
     log_format logf "$uri:$status";
 
-    error_log syslog:server=127.0.0.1:8084 info;
+    error_log syslog:server=127.0.0.1:%%PORT_8082_UDP%% info;
     error_log %%TESTDIR%%/f_http.log info;
 
     server {
@@ -54,93 +54,94 @@ http {
         server_name  localhost;
 
         location /e {
-            error_log syslog:server=127.0.0.1:8080;
+            error_log syslog:server=127.0.0.1:%%PORT_8084_UDP%%;
         }
         location /a {
-            access_log syslog:server=127.0.0.1:8080;
+            access_log syslog:server=127.0.0.1:%%PORT_8084_UDP%%;
         }
         location /ef {
-            error_log syslog:server=127.0.0.1:8080,facility=user;
+            error_log syslog:server=127.0.0.1:%%PORT_8084_UDP%%,facility=user;
         }
         location /es {
-            error_log syslog:server=127.0.0.1:8080,severity=alert;
+            error_log syslog:server=127.0.0.1:%%PORT_8084_UDP%%,severity=alert;
         }
         location /et {
-            error_log syslog:server=127.0.0.1:8080,tag=SEETHIS;
+            error_log syslog:server=127.0.0.1:%%PORT_8084_UDP%%,tag=SEETHIS;
         }
         location /af {
-            access_log syslog:server=127.0.0.1:8080,facility=user;
+            access_log syslog:server=127.0.0.1:%%PORT_8084_UDP%%,facility=user;
         }
         location /as {
             # put severity inside to catch possible parsing programming errors
-            access_log syslog:severity=alert,server=127.0.0.1:8080;
+            access_log syslog:severity=alert,server=127.0.0.1:%%PORT_8084_UDP%%;
         }
         location /at {
-            access_log syslog:server=127.0.0.1:8080,tag=SEETHIS;
+            access_log syslog:server=127.0.0.1:%%PORT_8084_UDP%%,tag=SEETHIS;
         }
         location /e2 {
-            error_log syslog:server=127.0.0.1:8080;
-            error_log syslog:server=127.0.0.1:8080;
+            error_log syslog:server=127.0.0.1:%%PORT_8084_UDP%%;
+            error_log syslog:server=127.0.0.1:%%PORT_8084_UDP%%;
         }
         location /a2 {
-            access_log syslog:server=127.0.0.1:8080;
-            access_log syslog:server=127.0.0.1:8080;
+            access_log syslog:server=127.0.0.1:%%PORT_8084_UDP%%;
+            access_log syslog:server=127.0.0.1:%%PORT_8084_UDP%%;
         }
         location /a_logf {
-            access_log syslog:server=127.0.0.1:8080 logf;
+            access_log syslog:server=127.0.0.1:%%PORT_8084_UDP%% logf;
         }
         location /if {
-            access_log syslog:server=127.0.0.1:8085 logf if=$arg_logme;
+            access_log syslog:server=127.0.0.1:%%PORT_8083_UDP%% logf
+                if=$arg_logme;
         }
 
         location /nohostname {
-            access_log syslog:server=127.0.0.1:8080,nohostname;
+            access_log syslog:server=127.0.0.1:%%PORT_8084_UDP%%,nohostname;
         }
 
         location /debug {
             limit_req zone=one;
-            error_log syslog:server=127.0.0.1:8080 debug;
+            error_log syslog:server=127.0.0.1:%%PORT_8084_UDP%% debug;
         }
         location /info {
             limit_req zone=one;
             limit_req_log_level info;
-            error_log syslog:server=127.0.0.1:8080 info;
+            error_log syslog:server=127.0.0.1:%%PORT_8084_UDP%% info;
         }
         location /notice {
             limit_req zone=one;
             limit_req_log_level notice;
-            error_log syslog:server=127.0.0.1:8080 notice;
+            error_log syslog:server=127.0.0.1:%%PORT_8084_UDP%% notice;
         }
         location /warn {
             limit_req zone=one;
             limit_req_log_level warn;
-            error_log syslog:server=127.0.0.1:8080 warn;
+            error_log syslog:server=127.0.0.1:%%PORT_8084_UDP%% warn;
         }
         location /error {
             limit_req zone=one;
             limit_req_log_level error;
-            error_log syslog:server=127.0.0.1:8080;
+            error_log syslog:server=127.0.0.1:%%PORT_8084_UDP%%;
         }
         location /low {
-            error_log syslog:server=127.0.0.1:8080 warn;
-            error_log syslog:server=127.0.0.1:8080;
+            error_log syslog:server=127.0.0.1:%%PORT_8084_UDP%% warn;
+            error_log syslog:server=127.0.0.1:%%PORT_8084_UDP%%;
         }
         location /dup {
-            error_log syslog:server=127.0.0.1:8080;
-            error_log syslog:server=127.0.0.1:8080;
+            error_log syslog:server=127.0.0.1:%%PORT_8084_UDP%%;
+            error_log syslog:server=127.0.0.1:%%PORT_8084_UDP%%;
         }
         location /high {
-            error_log syslog:server=127.0.0.1:8080 emerg;
-            error_log syslog:server=127.0.0.1:8080;
+            error_log syslog:server=127.0.0.1:%%PORT_8084_UDP%% emerg;
+            error_log syslog:server=127.0.0.1:%%PORT_8084_UDP%%;
         }
     }
 }
 
 EOF
 
-$t->run_daemon(\&syslog_daemon, 8083, $t, 's_glob.log');
-$t->run_daemon(\&syslog_daemon, 8084, $t, 's_http.log');
-$t->run_daemon(\&syslog_daemon, 8085, $t, 's_if.log');
+$t->run_daemon(\&syslog_daemon, port(8081), $t, 's_glob.log');
+$t->run_daemon(\&syslog_daemon, port(8082), $t, 's_http.log');
+$t->run_daemon(\&syslog_daemon, port(8083), $t, 's_if.log');
 
 $t->waitforfile($t->testdir . '/s_glob.log');
 $t->waitforfile($t->testdir . '/s_http.log');
@@ -226,7 +227,7 @@ like(get_syslog('/nohostname'),
 
 sub syslog_lines {
 	my ($uri, $pattern, $port) = @_;
-	return map { $_ =~ /\Q$pattern\E/g } (get_syslog($uri, $port));
+	return map { $_ =~ /\Q$pattern\E/g } (get_syslog($uri));
 }
 
 sub levels {
@@ -239,12 +240,10 @@ sub levels {
 }
 
 sub get_syslog {
-	my ($uri, $port) = @_;
+	my ($uri) = @_;
 	my ($s);
 	my $rfd = '';
 	my $data = '';
-
-	$port = 8080 unless defined $port;
 
 	eval {
 		local $SIG{ALRM} = sub { die "timeout\n" };
@@ -252,7 +251,7 @@ sub get_syslog {
 		alarm(1);
 		$s = IO::Socket::INET->new(
 			Proto => 'udp',
-			LocalAddr => "127.0.0.1:$port"
+			LocalAddr => '127.0.0.1:' . port(8084)
 		);
 		alarm(0);
 	};

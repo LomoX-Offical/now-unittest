@@ -39,8 +39,7 @@ http {
     %%TEST_GLOBALS_HTTP%%
 
     server {
-        listen       127.0.0.1:8080 http2;
-        listen       127.0.0.1:8081 proxy_protocol http2;
+        listen       127.0.0.1:8080 proxy_protocol http2;
         server_name  localhost;
 
         location /pp {
@@ -60,9 +59,9 @@ $t->run();
 ###############################################################################
 
 my $proxy = 'PROXY TCP4 192.0.2.1 192.0.2.2 1234 5678' . CRLF;
-my $sess = new_session(8081, proxy => $proxy);
-my $sid = new_stream($sess, { path => '/pp' });
-my $frames = h2_read($sess, all => [{ sid => $sid, fin => 1 }]);
+my $s = Test::Nginx::HTTP2->new(port(8080), proxy => $proxy);
+my $sid = $s->new_stream({ path => '/pp' });
+my $frames = $s->read(all => [{ sid => $sid, fin => 1 }]);
 
 my ($frame) = grep { $_->{type} eq "HEADERS" } @$frames;
 ok($frame, 'PROXY HEADERS frame');
@@ -70,8 +69,9 @@ is($frame->{headers}->{'x-pp'}, '192.0.2.1', 'PROXY remote addr');
 
 # invalid PROXY protocol string
 
-my $s = http('BOGUS TCP4 192.0.2.1 192.0.2.2 1234 5678', start => 1);
-$frames = h2_read({ socket => $s }, all => [{ type => 'GOAWAY' }]);
+$proxy = 'BOGUS TCP4 192.0.2.1 192.0.2.2 1234 5678' . CRLF;
+$s = Test::Nginx::HTTP2->new(port(8080), preface => $proxy, pure => 1);
+$frames = $s->read(all => [{ type => 'GOAWAY' }]);
 
 ($frame) = grep { $_->{type} eq "GOAWAY" } @$frames;
 ok($frame, 'invalid PROXY - GOAWAY frame');

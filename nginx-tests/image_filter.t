@@ -177,7 +177,7 @@ $t->write_file('png', $im->png);
 $t->write_file('txt', 'SEE-THIS');
 
 $t->run_daemon(\&http_daemon, $t);
-$t->run()->waitforsocket('127.0.0.1:8081');
+$t->run()->waitforsocket('127.0.0.1:' . port(8081));
 
 ###############################################################################
 
@@ -279,8 +279,8 @@ sub http_get_body {
 sub has_gdversion {
 	my ($need) = @_;
 
-	my $v_str = `gdlib-config --version 2>&1` or return;
-	($v_str) = $v_str =~ m!([0-9a-z.]+)!;
+	my $v_str = `gdlib-config --version 2>&1` or return 1;
+	($v_str) = $v_str =~ m!^([0-9.]+)! or return 1;
 	my @v = split(/\./, $v_str);
 	my ($n, $v);
 
@@ -303,7 +303,7 @@ sub http_daemon {
 	my $server = IO::Socket::INET->new(
 		Proto => 'tcp',
 		LocalHost => '127.0.0.1',
-		LocalPort => 8081,
+		LocalPort => port(8081),
 		Listen => 5,
 		Reuse => 1
 	)

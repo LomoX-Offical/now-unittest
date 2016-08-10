@@ -16,7 +16,7 @@ BEGIN { use FindBin; chdir($FindBin::Bin); }
 
 use lib 'lib';
 use Test::Nginx;
-use Test::Nginx::HTTP2 qw/ :DEFAULT :frame :io /;
+use Test::Nginx::HTTP2;
 
 ###############################################################################
 
@@ -87,7 +87,7 @@ is($f->{http_end}(), 200, 'many - response');
 
 $f = get_body('/');
 ok($f->{headers}, 'empty');
-is($f->{upload}('', body_more => 1), '', 'empty - part');
+is($f->{upload}('', body_more => 1, wait => 0.2), '', 'empty - part');
 is($f->{upload}(''), '_eos', 'empty - part 2');
 is($f->{http_end}(), 200, 'empty - response');
 
@@ -137,7 +137,7 @@ is($f->{http_end}(), 200, 'cl many - response');
 
 $f = get_body('/', 'content-length' => 0);
 ok($f->{headers}, 'cl empty');
-is($f->{upload}('', body_more => 1), '', 'cl empty - part');
+is($f->{upload}('', body_more => 1, wait => 0.2), '', 'cl empty - part');
 is($f->{upload}(''), '_eos', 'cl empty - part 2');
 is($f->{http_end}(), 200, 'cl empty - response');
 
@@ -190,16 +190,16 @@ sub get_body {
 	$server = IO::Socket::INET->new(
 		Proto => 'tcp',
 		LocalHost => '127.0.0.1',
-		LocalPort => 8081,
+		LocalPort => port(8081),
 		Listen => 5,
 		Timeout => 3,
 		Reuse => 1
 	)
 		or die "Can't create listening socket: $!\n";
 
-	my $sess = new_session(8080);
+	my $s = Test::Nginx::HTTP2->new();
 	my $sid = exists $extra{'content-length'}
-		? new_stream($sess, { headers => [
+		? $s->new_stream({ headers => [
 			{ name => ':method', value => 'GET' },
 			{ name => ':scheme', value => 'http' },
 			{ name => ':path', value => $url, },
@@ -207,13 +207,13 @@ sub get_body {
 			{ name => 'content-length',
 				value => $extra{'content-length'} }],
 			body_more => 1 })
-		: new_stream($sess, { path => $url, body_more => 1 });
+		: $s->new_stream({ path => $url, body_more => 1 });
 
 	$client = $server->accept() or return;
 
 	log2c("(new connection $client)");
 
-	$f->{headers} = raw_read($client, '', 1, \&log2i);
+	$f->{headers} = backend_read($client);
 
 	my $h = fastcgi_read_record(\$f->{headers});
 	my $version = $h->{version};
@@ -222,14 +222,14 @@ sub get_body {
 	$f->{upload} = sub {
 		my ($body, %extra) = @_;
 		my $len = length($body);
+		my $wait = $extra{wait};
 
-		h2_body($sess, $body, { %extra });
+		$s->h2_body($body, { %extra });
 
 		$body = '';
 
 		for (1 .. 10) {
-			my $buf = raw_read($client, '', 1, \&log2i)
-				or return '';
+			my $buf = backend_read($client, $wait) or return '';
 
 			while (my $h = fastcgi_read_record(\$buf)) {
 
@@ -259,11 +259,22 @@ EOF
 
 		$client->close;
 
-		my $frames = h2_read($sess, all => [{ sid => $sid, fin => 1 }]);
+		my $frames = $s->read(all => [{ sid => $sid, fin => 1 }]);
 		my ($frame) = grep { $_->{type} eq "HEADERS" } @$frames;
 		return $frame->{headers}->{':status'};
 	};
 	return $f;
+}
+
+sub backend_read {
+	my ($s, $timo) = @_;
+	my $buf = '';
+
+	if (IO::Select->new($s)->can_read($timo || 3)) {
+		$s->sysread($buf, 16384) or return;
+		log2i($buf);
+	}
+	return $buf;
 }
 
 sub log2i { Test::Nginx::log_core('|| <<', @_); }

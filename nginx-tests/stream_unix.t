@@ -71,8 +71,8 @@ for (1 .. 50) {
 
 my $str = 'SEE-THIS';
 
-is(stream('127.0.0.1:8080')->io($str), $str, 'proxy');
-is(stream('127.0.0.1:8081')->io($str), $str, 'upstream');
+is(stream('127.0.0.1:' . port(8080))->io($str), $str, 'proxy');
+is(stream('127.0.0.1:' . port(8081))->io($str), $str, 'upstream');
 
 ###############################################################################
 
