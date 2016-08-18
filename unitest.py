@@ -9,23 +9,27 @@ import subprocess
 import psutil
 
 def walk_dir(dir, py_path, topdown = True):
-    txt = '----------------------------------------\n';
-    txt += 'unit test result:\n';
-
-    logpath = os.path.abspath(py_path);
-    logfile = '%s\\result.log' % (logpath);
-    log = open(logfile, 'w');
-    log.write(txt);
-    log.close();
+    logpath = os.path.join(os.path.abspath(py_path), "result");
+    os.system("mkdir \"%s\"" %(logpath));
 
     for root, dirs, files in os.walk(dir, topdown):
         for name in files:
-            #if name != 'access.t' : 
+            #if name != 'fastcgi_body2.t' : 
             #    continue;
             if name.endswith('.t') == False:
                 continue;
 
-            print(os.path.join(name));
+            temppath = os.path.join(os.path.abspath(py_path), "temp");
+            if os.path.exists(temppath) :
+                os.system("rd /S /Q \"%s\"" % (temppath));
+
+            logfile = '%s\\%s.log' % (logpath, name);
+
+            if os.path.exists(logfile) :
+                print(name + " skip.");
+                continue;
+
+            print(name);
 
             killed = [];
             for proc in psutil.process_iter():
@@ -39,12 +43,15 @@ def walk_dir(dir, py_path, topdown = True):
             process = subprocess.Popen(args = cmd_line, stderr = subprocess.PIPE, stdout = subprocess.PIPE);
             out, err = process.communicate();
 
+            txt = '----------------------------------------\n';
+            txt += 'unit test result:\n';
             txt = '\n---\n';
             txt += '\nname:' + os.path.join(name);
             txt += '\nout:\n' + out;
             txt += '\nerr:\n' + err;
 
-            log = open(logfile, 'a');
+
+            log = open(logfile, 'w');
             log.write(txt);
             log.close();
 
