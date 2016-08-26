@@ -43,7 +43,7 @@ http {
 
     upstream u {
         server 127.0.0.1:8081 max_fails=0;
-        server 127.0.0.1:8082;
+        #server 127.0.0.1:8082;
     }
 
     server {
@@ -55,7 +55,7 @@ http {
             fastcgi_param REQUEST_URI $request_uri;
             fastcgi_param CONTENT_LENGTH $content_length;
             # fastcgi_next_upstream error timeout;
-            fastcgi_read_timeout 1s;
+            fastcgi_read_timeout 10s;
         }
 
         location /in_memory {
@@ -63,7 +63,7 @@ http {
             fastcgi_param REQUEST_URI $request_uri;
             fastcgi_param CONTENT_LENGTH $content_length;
             # fastcgi_next_upstream error timeout;
-            fastcgi_read_timeout 1s;
+            fastcgi_read_timeout 10s;
             client_body_buffer_size 128k;
         }
     }
@@ -72,11 +72,11 @@ http {
 EOF
 
 $t->run_daemon(\&fastcgi_daemon, port(8081));
-$t->run_daemon(\&fastcgi_daemon, port(8082));
+#$t->run_daemon(\&fastcgi_daemon, port(8082));
 $t->run();
 
 $t->waitforsocket('127.0.0.1:' . port(8081));
-$t->waitforsocket('127.0.0.1:' . port(8082));
+#$t->waitforsocket('127.0.0.1:' . port(8082));
 
 ###############################################################################
 
